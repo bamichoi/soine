@@ -1,0 +1,11 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 모델은 계정/서비스 소속 설계 ADR이 확정된 뒤 추가한다.

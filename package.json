@@ -1,0 +1,30 @@
+{
+  "name": "soine",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @soine/choidolsang-web --filter @soine/backend --filter @soine/backoffice dev",
+    "dev:choidolsang-web": "pnpm --filter @soine/choidolsang-web dev",
+    "dev:backend": "pnpm --filter @soine/backend dev",
+    "dev:backoffice": "pnpm --filter @soine/backoffice dev",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "pnpm --filter @soine/backend prisma:migrate",
+    "build": "pnpm --recursive --if-present build",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "test": "pnpm --recursive --if-present test",
+    "typecheck": "pnpm --recursive --if-present typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6"
+  }
+}

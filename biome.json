@@ -1,0 +1,245 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/dist",
+      "!**/build",
+      "!**/coverage",
+      "!**/.turbo",
+      "!**/.vercel",
+      "!**/*.generated.*",
+      "!**/pnpm-lock.yaml"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn",
+        "noUnusedFunctionParameters": "warn"
+      },
+
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noImplicitAnyLet": "warn",
+        "noAssignInExpressions": "error",
+        "noConsole": "warn",
+        "noDoubleEquals": "error",
+        "noEmptyBlockStatements": "warn",
+        "useAwait": "warn"
+      },
+
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 15
+          }
+        },
+        "noForEach": "warn",
+        "useFlatMap": "error",
+        "useOptionalChain": "error"
+      },
+
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useConst": "error",
+        "useImportType": "error",
+        "useExportType": "error",
+        "useEnumInitializers": "error",
+        "useBlockStatements": "warn",
+        "useCollapsedElseIf": "warn",
+        "useConsistentArrayType": {
+          "level": "warn",
+          "options": {
+            "syntax": "shorthand"
+          }
+        },
+        "useNamingConvention": {
+          "level": "warn",
+          "options": {
+            "strictCase": false,
+            "conventions": [
+              {
+                "selector": { "kind": "function" },
+                "formats": ["camelCase", "PascalCase"]
+              },
+              {
+                "selector": { "kind": "variable" },
+                "formats": ["camelCase", "PascalCase", "CONSTANT_CASE"]
+              },
+              {
+                "selector": { "kind": "typeLike" },
+                "formats": ["PascalCase"]
+              },
+              {
+                "selector": { "kind": "enumMember" },
+                "formats": ["PascalCase", "CONSTANT_CASE"]
+              }
+            ]
+          }
+        },
+        "useFilenamingConvention": {
+          "level": "warn",
+          "options": {
+            "filenameCases": ["camelCase", "PascalCase", "kebab-case"]
+          }
+        }
+      },
+
+      "performance": {
+        "noBarrelFile": "warn",
+        "noReExportAll": "warn"
+      },
+
+      "security": {
+        "noDangerouslySetInnerHtml": "error"
+      }
+    },
+
+    "domains": {
+      "react": "all",
+      "next": "all",
+      "test": "recommended"
+    }
+  },
+
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      "includes": [
+        "apps/choidolsang-web/src/app/**/page.tsx",
+        "apps/choidolsang-web/src/app/**/layout.tsx",
+        "apps/choidolsang-web/src/app/**/loading.tsx",
+        "apps/choidolsang-web/src/app/**/error.tsx",
+        "apps/choidolsang-web/src/app/**/not-found.tsx",
+        "apps/choidolsang-web/src/app/**/template.tsx",
+        "apps/choidolsang-web/src/app/**/default.tsx",
+        "apps/choidolsang-web/src/proxy.ts",
+        "apps/choidolsang-web/middleware.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off",
+            "useComponentExportOnlyModules": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/backoffice/src/app/**/page.tsx",
+        "apps/backoffice/src/app/**/layout.tsx",
+        "apps/backoffice/src/app/**/loading.tsx",
+        "apps/backoffice/src/app/**/error.tsx",
+        "apps/backoffice/src/app/**/not-found.tsx",
+        "apps/backoffice/src/app/**/template.tsx",
+        "apps/backoffice/src/app/**/default.tsx",
+        "apps/backoffice/src/proxy.ts",
+        "apps/backoffice/middleware.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off",
+            "useComponentExportOnlyModules": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/backend/**"],
+      "javascript": {
+        "parser": {
+          "unsafeParameterDecoratorsEnabled": true
+        }
+      },
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.e2e-spec.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noConsole": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.config.ts",
+        "**/*.config.js",
+        "**/next.config.*",
+        "**/tailwind.config.*",
+        "**/jest.config.*",
+        "**/vitest.config.*"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          },
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+# AGENTS.md — 팀 공통 규칙
+
+## 프로젝트 개요
+
+pnpm 워크스페이스 모노레포. 초이돌상(choidolsang) 서비스와 끼루(kkiru) 운영 도구를 함께 관리한다.
+
+## 도메인
+
+| 도메인                  | 앱                      | 용도                                             |
+| ----------------------- | ----------------------- | ------------------------------------------------ |
+| `choidolsang.com`       | `apps/choidolsang-web`  | 초이돌상 고객용 서비스                           |
+| `admin.choidolsang.com` | `apps/backoffice`       | 로그인 후 계정 소속에 따라 `/choidolsang` 또는 `/kkiru` 백오피스로 분기 |
+| `api.choidolsang.com`   | `apps/backend`          | 공통 REST API                                    |
+
+## 구조
+
+```bash
+apps/choidolsang-web/  # Next.js (초이돌상 고객 UI, REST API 소비자)
+apps/backoffice/       # Next.js (초이돌상·끼루 운영자 UI, 경로로 서비스 분기)
+apps/backend/          # NestJS (REST API, 비즈니스 로직, PostgreSQL)
+packages/api-contract/ # OpenAPI 스펙 & 생성 타입
+packages/shared/       # 공통 타입/유틸 (비즈니스 로직 금지)
+docs/adr/              # 아키텍처 의사결정 기록
+```
+
+## 핵심 규칙
+
+- 프론트/백엔드는 REST API(OpenAPI 계약)로만 통신. 앱 간 직접 import 금지.
+- 백오피스의 서비스 분기(`/choidolsang`, `/kkiru`) 접근 권한은 반드시 백엔드에서 강제한다.
+  프론트의 경로 가드는 UX용일 뿐 보안 경계가 아니다.
+- 코드 포맷/린트: Biome (single quotes, 2-space indent, 100자, trailing commas)
+- shared 패키지: 2곳 이상 중복 확인 후에만 승격. 비즈니스 로직 금지.
+- 보안/인증/결제/데이터 삭제 로직은 AI 제안만 참고하고 사람이 확정.
+
+## 로컬 포트
+
+| 앱                | 주소                    |
+| ----------------- | ----------------------- |
+| choidolsang-web   | `http://127.0.0.1:4000` |
+| backend           | `http://127.0.0.1:4001` |
+| backoffice        | `http://127.0.0.1:4002` |
+| PostgreSQL        | `127.0.0.1:5433`        |
+
+## 작업 프로세스
+
+1. **Issue 생성**: GitHub Issue 작성 (목표, 범위, 수락 기준 포함)
+2. **브랜치 생성**: `feat/이슈번호-설명` 또는 `fix/이슈번호-설명`
+3. **구현**: AGENTS.md 공통 규칙을 준수하며 작은 단위로 커밋.
+4. **검증**: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` 통과 확인.
+5. **PR 생성**: `Closes #이슈번호`로 Issue에 연결, PR 템플릿 준수.
+6. **리뷰**: 사람이 직접 리뷰 후 머지.
+7. **문서 최신화**: PR 머지 후 README.md 등 영향받는 문서 갱신.
+
+## 브랜치 규칙
+
+- 브랜치명: `feat/이슈번호-간단설명`, `fix/이슈번호-간단설명`, `chore/간단설명`
+- main에 직접 push 금지. 반드시 PR을 통해 머지.
+
+## CI 파이프라인
+
+`lint → format:check → typecheck → test → build` (모두 통과해야 머지 가능)
+
+## 커밋 메시지
+
+conventional commits 형식 사용:
+
+- `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`
+
+## ADR
+
+- 아키텍처/운영 정책/API 계약/DB 스키마 변경 시 ADR 작성.
+- 위치: `docs/adr/ADR-XXXX-제목.md` (템플릿: `docs/templates/adr-template.md`)
+- PR 본문에 ADR 파일 경로 연결.
+
+## AI 사용 규칙
+
+- AI 생성 코드는 사람이 최종 검토/책임진다.
+- PR에 AI 사용 내역(도구, 생성 범위, 검토 포인트)을 반드시 기록.
+- 프롬프트에는 목표, 제약조건, 수정 허용 파일, 금지사항, 완료조건을 포함.
