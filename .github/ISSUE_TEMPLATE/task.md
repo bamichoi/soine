@@ -30,11 +30,11 @@ assignees: ''
 ## 완료 조건
 
 - [ ] 수락 기준 전체 충족
-- [ ] CI 통과 (typecheck, lint, format, test, build)
+- [ ] 로컬 검증 통과 (typecheck, lint, format, test, build)
 - [ ] PR 리뷰 승인
 
 ## 검증 실패 시
 
-- CI 실패 → 같은 PR에서 수정 후 재커밋
+- 로컬 검증 실패 → 같은 PR에서 수정 후 재커밋
 - 리뷰 피드백 → 수정 후 re-request review
 - 수락 기준 미충족 → Issue 갱신 후 추가 구현

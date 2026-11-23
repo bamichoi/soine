@@ -15,8 +15,7 @@ packages/
 docs/
   adr/               # 의사결정 기록(ADR)
   templates/         # 문서 템플릿
-.github/
-  workflows/         # CI
+.github/             # PR/Issue 템플릿
 ```
 
 ## 기술 스택

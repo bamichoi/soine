@@ -66,9 +66,11 @@ docs/adr/              # 아키텍처 의사결정 기록
 - `dev`, `main`에 직접 push 금지. 반드시 PR을 통해 머지.
 - 운영 반영은 `dev` → `main` PR로만 한다.
 
-## CI 파이프라인
+## 머지 전 검증
 
-`lint → format:check → typecheck → test → build` (모두 통과해야 머지 가능)
+CI는 아직 없다. PR 전에 로컬에서 아래를 모두 통과시킨다.
+
+`pnpm lint → pnpm format:check → pnpm typecheck → pnpm test → pnpm build`
 
 ## 커밋 메시지
 
