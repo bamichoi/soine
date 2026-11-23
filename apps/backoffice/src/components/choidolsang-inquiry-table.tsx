@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
+import { Pagination } from '@/components/pagination';
 import {
   formatInquiryDate,
   formatSeoulDateTime,
@@ -334,28 +335,13 @@ export function ChoidolsangInquiryTable() {
         ) : null}
       </div>
 
-      {pagination && pagination.totalPages > 1 ? (
-        <nav aria-label="문의 기록 페이지" className="flex items-center justify-center gap-3">
-          <button
-            className={BUTTON_CLASS_NAME}
-            disabled={pagination.page <= 1}
-            onClick={() => updateQuery({ page: pagination.page - 1 })}
-            type="button"
-          >
-            이전
-          </button>
-          <span className="text-sm tabular-nums text-[var(--muted)]">
-            {pagination.page} / {pagination.totalPages}
-          </span>
-          <button
-            className={BUTTON_CLASS_NAME}
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() => updateQuery({ page: pagination.page + 1 })}
-            type="button"
-          >
-            다음
-          </button>
-        </nav>
+      {pagination ? (
+        <Pagination
+          label="문의 기록 페이지"
+          onChange={(page) => updateQuery({ page })}
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+        />
       ) : null}
     </section>
   );
