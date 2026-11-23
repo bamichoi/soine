@@ -41,6 +41,38 @@ model ChoidolsangAdminSession {
   @@schema("choidolsang")
 }
 
+/// 초이돌상 문의 처리 상태.
+enum ChoidolsangInquiryStatus {
+  pending // 대기
+  confirmed // 예약확정
+  rejected // 거절
+
+  @@map("inquiry_status")
+  @@schema("choidolsang")
+}
+
+/// 초이돌상 고객 문의.
+model ChoidolsangInquiry {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  /// 문의 날짜 (필수)
+  inquiredOn           DateTime                 @db.Date
+  /// 문의 내용 (필수)
+  content              String                   @db.Text
+  /// 희망 예약 날짜·시간
+  desiredReservationAt DateTime?                @db.Timestamptz(3)
+  /// 장소
+  location             String?                  @db.VarChar(200)
+  /// 희망 돌상 컨셉. 돌상 컨셉 테이블이 생기면 참조로 바꾼다.
+  desiredConcept       String?                  @db.VarChar(200)
+  status               ChoidolsangInquiryStatus @default(pending)
+  createdAt            DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                 @updatedAt @db.Timestamptz(3)
+
+  @@index([inquiredOn(sort: Desc), createdAt(sort: Desc)], map: "inquiries_inquired_on_idx")
+  @@map("inquiries")
+  @@schema("choidolsang")
+}
+
 // ────────────────────────────────── kkiru ──────────────────────────────────
 
 /// 끼루 백오피스 관리자 계정.
