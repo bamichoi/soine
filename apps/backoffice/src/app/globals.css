@@ -18,3 +18,11 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Tailwind 4는 버튼 기본 커서를 default로 둔다. 클릭 가능한 요소는 포인터로 되돌린다. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
