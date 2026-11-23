@@ -11,7 +11,7 @@ export type AdminMenuItem = {
 export const ADMIN_MENUS: Record<AdminService, AdminMenuItem[]> = {
   choidolsang: [
     { href: '/choidolsang/schedule', icon: 'calendar', label: '일정' },
-    { href: '/choidolsang/consultations', icon: 'message', label: '상담' },
+    { href: '/choidolsang/inquiries', icon: 'message', label: '문의' },
     { href: '/choidolsang/reservations', icon: 'clipboard-check', label: '예약' },
     { href: '/choidolsang/concepts', icon: 'sparkles', label: '돌상 컨셉' },
     { href: '/choidolsang/marketing', icon: 'megaphone', label: '마케팅' },

@@ -32,7 +32,7 @@ export class AdminApiError extends Error {
   }
 }
 
-async function requestAdminApi(path: string, init?: RequestInit): Promise<Response> {
+export async function requestAdminApi(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`/api/admin/${path}`, { credentials: 'include', ...init });
 
   if (!response.ok) {

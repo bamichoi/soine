@@ -41,6 +41,61 @@ model ChoidolsangAdminSession {
   @@schema("choidolsang")
 }
 
+/// 초이돌상 문의 처리 상태.
+enum ChoidolsangInquiryStatus {
+  pending // 대기
+  confirmed // 예약확정
+  rejected // 거절
+  cancelled // 취소 (예약확정 후 예약이 취소됨)
+
+  @@map("inquiry_status")
+  @@schema("choidolsang")
+}
+
+/// 초이돌상 고객 문의.
+model ChoidolsangInquiry {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  /// 화면·주소에 쓰는 문의 번호. 순서가 드러나지 않는 8자리 무작위 코드 (예: 7K3FQ9AM).
+  code                 String                     @unique @db.VarChar(16)
+  /// 문의 날짜. 로그 첫 기록의 날짜와 같게 유지한다(목록 정렬용).
+  inquiredOn           DateTime                   @db.Date
+  /// 희망 예약 날짜·시간
+  desiredReservationAt DateTime?                  @db.Timestamptz(3)
+  /// 장소
+  location             String?                    @db.VarChar(200)
+  /// 희망 돌상 컨셉. 돌상 컨셉 테이블이 생기면 참조로 바꾼다.
+  desiredConcept       String?                    @db.VarChar(200)
+  status               ChoidolsangInquiryStatus   @default(pending)
+  /// 거절 사유. 거절(rejected) 상태일 때만 값이 있다.
+  rejectionReason      String?                    @db.Text
+  /// 숨김 삭제 시각. 값이 있으면 목록·상세에서 보이지 않는다.
+  deletedAt            DateTime?                  @db.Timestamptz(3)
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                   @updatedAt @db.Timestamptz(3)
+  /// 문의 내용 로그. 첫 기록이 첫 문의다.
+  records              ChoidolsangInquiryRecord[]
+
+  @@index([inquiredOn(sort: Desc), createdAt(sort: Desc)], map: "inquiries_inquired_on_idx")
+  @@map("inquiries")
+  @@schema("choidolsang")
+}
+
+/// 문의 내용 로그. 첫 문의와 그 뒤에 이어진 문의를 기록 하나씩 쌓는다. 문의마다 1개 이상.
+model ChoidolsangInquiryRecord {
+  id         String             @id @default(uuid()) @db.Uuid
+  inquiryId  String             @db.Uuid
+  inquiry    ChoidolsangInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  /// 기록 날짜 (필수)
+  recordedOn DateTime           @db.Date
+  /// 기록 내용 (필수)
+  content    String             @db.Text
+  createdAt  DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@index([inquiryId, recordedOn, createdAt], map: "inquiry_records_inquiry_id_idx")
+  @@map("inquiry_records")
+  @@schema("choidolsang")
+}
+
 // ────────────────────────────────── kkiru ──────────────────────────────────
 
 /// 끼루 백오피스 관리자 계정.
@@ -68,4 +123,23 @@ model KkiruAdminSession {
   @@index([expire], map: "admin_sessions_expire_idx")
   @@map("admin_sessions")
   @@schema("kkiru")
+}
+
+/// 초이돌상 돌상 컨셉. 고객에게 파는 돌상 세트 상품이다.
+model ChoidolsangConcept {
+  id         String    @id @default(uuid()) @db.Uuid
+  /// 컨셉 이름 (필수)
+  name       String    @db.VarChar(100)
+  /// 구성품 목록. 하나씩 추가한 순서대로 저장한다.
+  components String[]  @default([])
+  /// 가격 (원, 필수)
+  price      Int
+  /// 숨김 삭제 시각. 값이 있으면 목록·상세에서 보이지 않는다.
+  deletedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([createdAt(sort: Desc)], map: "concepts_created_at_idx")
+  @@map("concepts")
+  @@schema("choidolsang")
 }

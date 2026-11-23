@@ -4,16 +4,22 @@ import type { CSSProperties } from 'react';
 // 파일을 마스크로 써서 글자색(currentColor)을 따라가므로 hover 색 변경 등이 그대로 적용된다.
 // 새 아이콘은 파일을 추가하고 아래 목록에 이름을 등록한다.
 const ICON_NAMES = [
+  'arrow-down',
+  'arrow-left',
+  'arrow-up',
   'calendar',
   'chart-bar',
+  'chevron-down',
   'chevron-right',
+  'chevrons-up-down',
   'clipboard-check',
   'eye',
   'eye-off',
   'logout',
-  'menu',
   'megaphone',
+  'menu',
   'message',
+  'plus',
   'sparkles',
   'x',
 ] as const;
