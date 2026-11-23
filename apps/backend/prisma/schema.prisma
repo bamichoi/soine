@@ -46,6 +46,7 @@ enum ChoidolsangInquiryStatus {
   pending // 대기
   confirmed // 예약확정
   rejected // 거절
+  cancelled // 취소 (예약확정 후 예약이 취소됨)
 
   @@map("inquiry_status")
   @@schema("choidolsang")

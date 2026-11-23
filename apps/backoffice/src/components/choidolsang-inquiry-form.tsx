@@ -6,13 +6,13 @@ import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
+  CREATABLE_INQUIRY_STATUSES,
   type CreateInquiryInput,
   createInquiry,
   getSeoulToday,
   INQUIRY_CONTENT_MAX_LENGTH,
   INQUIRY_SHORT_TEXT_MAX_LENGTH,
   INQUIRY_STATUS_LABELS,
-  INQUIRY_STATUSES,
   type InquiryStatus,
   REJECTION_REASON_MAX_LENGTH,
 } from '@/lib/choidolsang-inquiries-api';
@@ -252,7 +252,7 @@ export function ChoidolsangInquiryForm() {
               onChange={(event) => setStatus(event.target.value as InquiryStatus)}
               value={status}
             >
-              {INQUIRY_STATUSES.map((value) => (
+              {CREATABLE_INQUIRY_STATUSES.map((value) => (
                 <option key={value} value={value}>
                   {INQUIRY_STATUS_LABELS[value]}
                 </option>

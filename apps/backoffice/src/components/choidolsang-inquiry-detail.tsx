@@ -37,9 +37,12 @@ function InfoItem({ label, children }: { label: string; children: ReactNode }) {
 function InquiryBody({ inquiry }: { inquiry: InquiryDetail }) {
   return (
     <div className="flex flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-center gap-3">
+      <header className="flex items-center justify-between gap-3">
+        <p className="flex items-baseline gap-2 text-sm">
+          <span className="text-[var(--muted)]">문의 번호</span>
+          <span className="font-mono tracking-wide">{inquiry.code}</span>
+        </p>
         <InquiryStatusBadge status={inquiry.status} />
-        <span className="font-mono text-sm tracking-wide text-[var(--muted)]">{inquiry.code}</span>
       </header>
 
       <section aria-label="문의 내용" className="bg-[var(--background)] px-5 py-4">
@@ -77,13 +80,13 @@ type InquiryActionsProps = {
   onChange: (inquiry: InquiryDetail) => void;
 };
 
-// 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정: 버튼 없음
+// 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정·취소: 버튼 없음
 function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  if (inquiry.status === 'confirmed') {
+  if (inquiry.status === 'confirmed' || inquiry.status === 'cancelled') {
     return null;
   }
 

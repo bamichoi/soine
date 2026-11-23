@@ -19,6 +19,7 @@ export const INQUIRY_PAGE_SIZE = 20;
 const CODE_GENERATION_ATTEMPTS = 5;
 
 const STATUS_LABELS: Record<ChoidolsangInquiryStatus, string> = {
+  cancelled: '취소',
   confirmed: '예약확정',
   pending: '대기',
   rejected: '거절',

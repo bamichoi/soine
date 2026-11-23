@@ -1,9 +1,13 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
 
-export const INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+export const INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled'] as const;
 export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
 
+// 취소는 연결된 예약이 취소될 때만 바뀌므로 문의를 추가할 때는 고를 수 없다.
+export const CREATABLE_INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+
 export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
+  cancelled: '취소',
   confirmed: '예약확정',
   pending: '대기',
   rejected: '거절',

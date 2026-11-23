@@ -1,6 +1,7 @@
 import { INQUIRY_STATUS_LABELS, type InquiryStatus } from '@/lib/choidolsang-inquiries-api';
 
 const STATUS_CLASS_NAMES: Record<InquiryStatus, string> = {
+  cancelled: 'bg-[var(--background)] text-[var(--muted)]',
   confirmed: 'bg-[var(--success-soft)] text-[var(--success)]',
   pending: 'bg-[var(--warning-soft)] text-[var(--warning)]',
   rejected: 'bg-[var(--error-soft)] text-[var(--error)]',

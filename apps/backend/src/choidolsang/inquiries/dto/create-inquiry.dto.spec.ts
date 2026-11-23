@@ -51,6 +51,16 @@ describe('CreateInquiryDto', () => {
     expect(withZone.properties).toEqual([]);
   });
 
+  it('does not allow creating a cancelled inquiry', async () => {
+    const { properties } = await validateInput({
+      content: '문의',
+      inquiredOn: '2026-11-23',
+      status: 'cancelled',
+    });
+
+    expect(properties).toContain('status');
+  });
+
   it('rejects an unknown status', async () => {
     const { properties } = await validateInput({
       content: '문의',
