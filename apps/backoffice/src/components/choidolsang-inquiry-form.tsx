@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react';
+import { ConceptSelect } from '@/components/concept-select';
 import { Icon } from '@/components/icon';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
@@ -77,7 +78,7 @@ type FormValues = {
   reservationDate: string;
   reservationTime: string;
   location: string;
-  desiredConcept: string;
+  desiredConceptId: string;
   status: InquiryStatus;
   rejectionReason: string;
 };
@@ -105,7 +106,7 @@ function buildCreateInput(values: FormValues): CreateInquiryInput | string {
 
   return {
     content: values.content.trim(),
-    desiredConcept: values.desiredConcept.trim() || null,
+    desiredConceptId: values.desiredConceptId || null,
     desiredReservationAt,
     inquiredOn: values.inquiredOn,
     location: values.location.trim() || null,
@@ -116,7 +117,7 @@ function buildCreateInput(values: FormValues): CreateInquiryInput | string {
 
 function toUpdateInput(input: CreateInquiryInput, isRejected: boolean): UpdateInquiryInput {
   const fields = {
-    desiredConcept: input.desiredConcept,
+    desiredConceptId: input.desiredConceptId,
     desiredReservationAt: input.desiredReservationAt,
     location: input.location,
   };
@@ -165,7 +166,7 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
   const [reservationDate, setReservationDate] = useState(initialReservation.date);
   const [reservationTime, setReservationTime] = useState(initialReservation.time);
   const [location, setLocation] = useState(inquiry?.location ?? '');
-  const [desiredConcept, setDesiredConcept] = useState(inquiry?.desiredConcept ?? '');
+  const [desiredConceptId, setDesiredConceptId] = useState(inquiry?.desiredConcept?.id ?? '');
   const [status, setStatus] = useState<InquiryStatus>(inquiry?.status ?? 'pending');
   const [rejectionReason, setRejectionReason] = useState(inquiry?.rejectionReason ?? '');
   const [errorMessage, setErrorMessage] = useState('');
@@ -175,7 +176,7 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
     event.preventDefault();
     const result = buildCreateInput({
       content,
-      desiredConcept,
+      desiredConceptId,
       inquiredOn,
       location,
       rejectionReason,
@@ -283,12 +284,11 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
         </Field>
 
         <Field htmlFor={id('desired-concept')} label="희망 돌상 컨셉">
-          <input
-            className={`${CONTROL_CLASS_NAME} h-10`}
+          <ConceptSelect
+            current={inquiry?.desiredConcept ?? null}
             id={id('desired-concept')}
-            maxLength={INQUIRY_SHORT_TEXT_MAX_LENGTH}
-            onChange={(event) => setDesiredConcept(event.target.value)}
-            value={desiredConcept}
+            onChange={setDesiredConceptId}
+            value={desiredConceptId}
           />
         </Field>
 

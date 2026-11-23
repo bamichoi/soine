@@ -18,6 +18,13 @@ export type Concept = {
   updatedAt: string;
 };
 
+/** 다른 화면에서 컨셉을 고를 때 쓰는 짧은 항목 */
+export type ConceptOption = {
+  id: string;
+  name: string;
+  price: number;
+};
+
 export type ConceptListResponse = {
   items: Concept[];
   pagination: {
@@ -76,6 +83,13 @@ export async function listConcepts(query: ConceptListQuery): Promise<ConceptList
   const response = await requestAdminApi(params ? `${CONCEPTS_PATH}?${params}` : CONCEPTS_PATH);
 
   return (await response.json()) as ConceptListResponse;
+}
+
+/** 고를 수 있는 컨셉 전체 (이름순) */
+export async function listConceptOptions(): Promise<ConceptOption[]> {
+  const response = await requestAdminApi(`${CONCEPTS_PATH}/options`);
+
+  return (await response.json()) as ConceptOption[];
 }
 
 export async function getConcept(id: string): Promise<Concept> {

@@ -17,6 +17,13 @@ export type Concept = {
   updatedAt: string;
 };
 
+/** 다른 화면에서 컨셉을 고를 때 쓰는 짧은 항목 */
+export type ConceptOption = {
+  id: string;
+  name: string;
+  price: number;
+};
+
 export type ConceptListResponse = {
   items: Concept[];
   pagination: {
@@ -77,6 +84,15 @@ export class ChoidolsangConceptsService {
         totalPages: Math.max(1, Math.ceil(total / CONCEPT_PAGE_SIZE)),
       },
     };
+  }
+
+  /** 고를 수 있는(숨김 삭제되지 않은) 컨셉 전체를 이름순으로. 문의의 희망 컨셉 선택에 쓴다. */
+  listOptions(): Promise<ConceptOption[]> {
+    return this.prisma.choidolsangConcept.findMany({
+      orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, price: true },
+      where: NOT_DELETED,
+    });
   }
 
   async findById(id: string): Promise<Concept> {

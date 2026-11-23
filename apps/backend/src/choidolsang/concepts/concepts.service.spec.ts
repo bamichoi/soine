@@ -87,3 +87,18 @@ describe('ChoidolsangConceptsService', () => {
     });
   });
 });
+
+describe('ChoidolsangConceptsService options', () => {
+  it('lists selectable concepts by name with id, name and price only', async () => {
+    const findMany = jest.fn(() => Promise.resolve([]));
+    const prisma = { choidolsangConcept: { findMany } } as unknown as PrismaService;
+
+    await new ChoidolsangConceptsService(prisma).listOptions();
+
+    expect(findMany).toHaveBeenCalledWith({
+      orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, price: true },
+      where: { deletedAt: null },
+    });
+  });
+});

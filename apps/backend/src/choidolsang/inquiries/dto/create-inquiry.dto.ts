@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   ValidateIf,
@@ -63,11 +64,11 @@ export class InquiryOptionalFieldsDto {
   @MaxLength(INQUIRY_SHORT_TEXT_MAX_LENGTH)
   location?: string | null;
 
+  /** 희망 돌상 컨셉 ID. 비우면 null */
   @IsOptional()
   @Transform(trimToNull)
-  @IsString()
-  @MaxLength(INQUIRY_SHORT_TEXT_MAX_LENGTH)
-  desiredConcept?: string | null;
+  @IsUUID()
+  desiredConceptId?: string | null;
 }
 
 export class CreateInquiryDto extends InquiryOptionalFieldsDto {

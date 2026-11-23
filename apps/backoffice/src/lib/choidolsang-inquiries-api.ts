@@ -17,6 +17,13 @@ export const INQUIRY_CONTENT_MAX_LENGTH = 5000;
 export const INQUIRY_SHORT_TEXT_MAX_LENGTH = 200;
 export const REJECTION_REASON_MAX_LENGTH = 1000;
 
+/** 문의가 참조하는 돌상 컨셉 */
+export type InquiryConceptRef = {
+  id: string;
+  name: string;
+  isDeleted: boolean;
+};
+
 export type Inquiry = {
   id: string;
   /** 문의 번호 (무작위 코드) */
@@ -27,7 +34,8 @@ export type Inquiry = {
   /** 희망 예약 일시 (ISO 8601) */
   desiredReservationAt: string | null;
   location: string | null;
-  desiredConcept: string | null;
+  /** 희망 돌상 컨셉. 숨김 삭제된 컨셉이면 isDeleted가 true */
+  desiredConcept: InquiryConceptRef | null;
   status: InquiryStatus;
 };
 
@@ -155,7 +163,8 @@ export type CreateInquiryInput = {
   content: string;
   desiredReservationAt: string | null;
   location: string | null;
-  desiredConcept: string | null;
+  /** 희망 돌상 컨셉 ID */
+  desiredConceptId: string | null;
   status: InquiryStatus;
   /** 상태가 거절일 때만 보낸다. */
   rejectionReason: string | null;
@@ -237,7 +246,7 @@ export async function reopenInquiry(code: string): Promise<InquiryDetail> {
  */
 export type UpdateInquiryInput = Pick<
   CreateInquiryInput,
-  'desiredReservationAt' | 'location' | 'desiredConcept'
+  'desiredReservationAt' | 'location' | 'desiredConceptId'
 > & {
   rejectionReason?: string;
 };

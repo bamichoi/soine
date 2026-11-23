@@ -1,5 +1,11 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  type ChoidolsangConcept,
   type ChoidolsangInquiry,
   type ChoidolsangInquiryRecord,
   type ChoidolsangInquiryStatus,
@@ -28,6 +34,13 @@ const STATUS_LABELS: Record<ChoidolsangInquiryStatus, string> = {
   rejected: '거절',
 };
 
+/** 문의가 참조하는 돌상 컨셉 */
+export type InquiryConceptRef = {
+  id: string;
+  name: string;
+  isDeleted: boolean;
+};
+
 export type InquiryListItem = {
   id: string;
   /** 문의 번호 (무작위 코드) */
@@ -39,7 +52,8 @@ export type InquiryListItem = {
   /** 희망 예약 일시 (ISO 8601), 없으면 null */
   desiredReservationAt: string | null;
   location: string | null;
-  desiredConcept: string | null;
+  /** 희망 돌상 컨셉. 숨김 삭제된 컨셉이면 isDeleted가 true */
+  desiredConcept: InquiryConceptRef | null;
   status: ChoidolsangInquiryStatus;
 };
 
@@ -96,6 +110,11 @@ function buildFieldCondition(field: Exclude<InquirySearchField, 'all'>, query: s
       return {
         records: { some: { content: { contains: query, mode: 'insensitive' } } },
       } satisfies InquiryWhere;
+    case 'desiredConcept':
+      // 희망 컨셉은 참조한 컨셉 이름에서 찾는다.
+      return {
+        desiredConcept: { is: { name: { contains: query, mode: 'insensitive' } } },
+      } satisfies InquiryWhere;
     default:
       return { [field]: { contains: query, mode: 'insensitive' } } satisfies InquiryWhere;
   }
@@ -119,16 +138,21 @@ export function buildInquiryWhere(field: InquirySearchField, query: string): Inq
   return { OR: conditions };
 }
 
-const NULLABLE_SORT_FIELDS = new Set<InquirySortField>([
-  'desiredReservationAt',
-  'location',
-  'desiredConcept',
-]);
+const NULLABLE_SORT_FIELDS = new Set<InquirySortField>(['desiredReservationAt', 'location']);
 
-export function buildInquiryOrderBy(sort: InquirySortField, order: SortOrder): InquiryOrderBy[] {
-  const primary: InquiryOrderBy = NULLABLE_SORT_FIELDS.has(sort)
+function buildPrimaryOrderBy(sort: InquirySortField, order: SortOrder): InquiryOrderBy {
+  if (sort === 'desiredConcept') {
+    // 희망 컨셉은 컨셉 이름순. 컨셉이 없는 문의는 오름차순에서 뒤, 내림차순에서 앞에 온다.
+    return { desiredConcept: { name: order } };
+  }
+
+  return NULLABLE_SORT_FIELDS.has(sort)
     ? { [sort]: { nulls: 'last', sort: order } }
     : { [sort]: order };
+}
+
+export function buildInquiryOrderBy(sort: InquirySortField, order: SortOrder): InquiryOrderBy[] {
+  const primary = buildPrimaryOrderBy(sort, order);
 
   // 같은 값끼리는 최근에 등록한 문의가 먼저 오도록 한다.
   return [primary, { createdAt: 'desc' }];
@@ -140,7 +164,16 @@ const RECORD_ORDER = [
   { createdAt: 'asc' },
 ] satisfies Prisma.ChoidolsangInquiryRecordOrderByWithRelationInput[];
 
-type InquiryWithRecords = ChoidolsangInquiry & { records: ChoidolsangInquiryRecord[] };
+type InquiryWithRecords = ChoidolsangInquiry & {
+  records: ChoidolsangInquiryRecord[];
+  desiredConcept: ChoidolsangConcept | null;
+};
+
+function toConceptRef(concept: ChoidolsangConcept | null): InquiryConceptRef | null {
+  return concept
+    ? { id: concept.id, isDeleted: concept.deletedAt !== null, name: concept.name }
+    : null;
+}
 
 // DATE 컬럼은 UTC 자정으로 읽히므로 날짜 부분만 쓴다.
 function toDateString(date: Date): string {
@@ -156,7 +189,7 @@ function toListItem(inquiry: InquiryWithRecords): InquiryListItem {
   return {
     code: inquiry.code,
     content: inquiry.records[0]?.content ?? '',
-    desiredConcept: inquiry.desiredConcept,
+    desiredConcept: toConceptRef(inquiry.desiredConcept),
     desiredReservationAt: inquiry.desiredReservationAt?.toISOString() ?? null,
     id: inquiry.id,
     inquiredOn: toDateString(inquiry.inquiredOn),
@@ -184,12 +217,18 @@ function toDetail(inquiry: InquiryWithRecords): InquiryDetail {
   };
 }
 
+// 상세에는 문의 내용 로그 전체와 희망 컨셉을 함께 싣는다.
+const INQUIRY_INCLUDE = {
+  desiredConcept: true,
+  records: { orderBy: RECORD_ORDER },
+} satisfies Prisma.ChoidolsangInquiryInclude;
+
 // 숨김 삭제한 문의는 어디서도 보이지 않는다.
 const NOT_DELETED = { deletedAt: null } satisfies InquiryWhere;
 
 function toOptionalFieldData(input: InquiryOptionalFieldsDto) {
   return {
-    desiredConcept: input.desiredConcept ?? null,
+    desiredConceptId: input.desiredConceptId ?? null,
     desiredReservationAt: input.desiredReservationAt ? new Date(input.desiredReservationAt) : null,
     location: input.location ?? null,
   };
@@ -229,7 +268,7 @@ export class ChoidolsangInquiriesService {
       this.prisma.choidolsangInquiry.count({ where }),
       this.prisma.choidolsangInquiry.findMany({
         // 목록의 문의 내용은 첫 기록(첫 문의)만 보여 준다.
-        include: { records: { orderBy: RECORD_ORDER, take: 1 } },
+        include: { desiredConcept: true, records: { orderBy: RECORD_ORDER, take: 1 } },
         orderBy: buildInquiryOrderBy(sort, order),
         skip: (page - 1) * INQUIRY_PAGE_SIZE,
         take: INQUIRY_PAGE_SIZE,
@@ -261,6 +300,7 @@ export class ChoidolsangInquiriesService {
 
   /** 문의를 추가한다. 문의 내용은 로그의 첫 기록으로, 문의 날짜는 그 기록 날짜로 저장한다. */
   async create(input: CreateInquiryDto): Promise<InquiryDetail> {
+    await this.assertSelectableConcept(input.desiredConceptId);
     const inquiredOn = toDateOnly(input.inquiredOn);
     const data = {
       ...toOptionalFieldData(input),
@@ -275,7 +315,7 @@ export class ChoidolsangInquiriesService {
       try {
         const inquiry = await this.prisma.choidolsangInquiry.create({
           data: { ...data, code: generateInquiryCode() },
-          include: { records: { orderBy: RECORD_ORDER } },
+          include: INQUIRY_INCLUDE,
         });
 
         return toDetail(inquiry);
@@ -293,6 +333,12 @@ export class ChoidolsangInquiriesService {
    */
   async update(rawCode: string, input: UpdateInquiryDto): Promise<InquiryDetail> {
     const { code, inquiry } = await this.requireActive(rawCode);
+
+    // 이미 고른 컨셉은 그사이 숨김 삭제됐어도 그대로 둘 수 있다.
+    if (input.desiredConceptId !== inquiry.desiredConceptId) {
+      await this.assertSelectableConcept(input.desiredConceptId);
+    }
+
     const data = {
       ...toOptionalFieldData(input),
       ...(inquiry.status === 'rejected' && input.rejectionReason
@@ -441,6 +487,22 @@ export class ChoidolsangInquiriesService {
     return this.findByCode(code);
   }
 
+  /** 새로 고르는 희망 컨셉은 있고 숨김 삭제되지 않은 것이어야 한다. */
+  private async assertSelectableConcept(conceptId: string | null | undefined): Promise<void> {
+    if (!conceptId) {
+      return;
+    }
+
+    const concept = await this.prisma.choidolsangConcept.findFirst({
+      select: { id: true },
+      where: { deletedAt: null, id: conceptId },
+    });
+
+    if (!concept) {
+      throw new BadRequestException('Unknown concept');
+    }
+  }
+
   private async requireActive(rawCode: string) {
     const code = normalizeInquiryCode(rawCode);
     const inquiry = code ? await this.findActive(code) : null;
@@ -454,7 +516,7 @@ export class ChoidolsangInquiriesService {
 
   private findActive(code: string) {
     return this.prisma.choidolsangInquiry.findFirst({
-      include: { records: { orderBy: RECORD_ORDER } },
+      include: INQUIRY_INCLUDE,
       where: { code, ...NOT_DELETED },
     });
   }
