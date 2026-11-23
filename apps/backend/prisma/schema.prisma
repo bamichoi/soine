@@ -54,6 +54,8 @@ enum ChoidolsangInquiryStatus {
 /// 초이돌상 고객 문의.
 model ChoidolsangInquiry {
   id                   String                   @id @default(uuid()) @db.Uuid
+  /// 화면·주소에 쓰는 문의 번호. 순서가 드러나지 않는 8자리 무작위 코드 (예: 7K3FQ9AM).
+  code                 String                   @unique @db.VarChar(16)
   /// 문의 날짜 (필수)
   inquiredOn           DateTime                 @db.Date
   /// 문의 내용 (필수)
@@ -65,6 +67,8 @@ model ChoidolsangInquiry {
   /// 희망 돌상 컨셉. 돌상 컨셉 테이블이 생기면 참조로 바꾼다.
   desiredConcept       String?                  @db.VarChar(200)
   status               ChoidolsangInquiryStatus @default(pending)
+  /// 거절 사유. 거절(rejected) 상태일 때만 값이 있다.
+  rejectionReason      String?                  @db.Text
   createdAt            DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime                 @updatedAt @db.Timestamptz(3)
 
