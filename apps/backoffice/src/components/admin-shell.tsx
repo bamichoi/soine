@@ -25,7 +25,7 @@ const ICON_BUTTON_CLASS_NAME =
 
 // 백오피스 공통 레이아웃.
 // 맨 위 헤더가 전체 너비로 깔리고, 그 아래에 사이드 메뉴와 본문이 놓인다.
-// 좁은 화면에서는 헤더의 햄버거 버튼으로 사이드 메뉴를 왼쪽에서 꺼낸다.
+// 좁은 화면에서는 헤더 오른쪽 햄버거 버튼으로 메뉴를 오른쪽에서 꺼내고, 로그아웃도 메뉴 안에 둔다.
 export function AdminShell({
   service,
   adminName,
@@ -70,18 +70,7 @@ export function AdminShell({
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-3 md:px-5">
-        <div className="flex min-w-0 items-center gap-1">
-          <button
-            aria-controls={drawerId}
-            aria-expanded={isMenuOpen}
-            aria-label="메뉴 열기"
-            className={`${ICON_BUTTON_CLASS_NAME} shrink-0 md:hidden`}
-            onClick={() => setIsMenuOpen(true)}
-            ref={openButtonRef}
-            type="button"
-          >
-            <Icon name="menu" />
-          </button>
+        <div className="flex min-w-0 items-center gap-1 pl-2 md:pl-0">
           <nav aria-label="현재 위치" className="min-w-0">
             <ol className="flex items-center gap-1.5">
               <li className="shrink-0">
@@ -101,17 +90,30 @@ export function AdminShell({
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="hidden max-w-48 truncate text-sm text-[var(--muted)] sm:inline">
+          {/* 넓은 화면: 관리자 이름과 로그아웃을 헤더에 둔다. */}
+          <span className="hidden max-w-48 truncate text-sm text-[var(--muted)] md:inline">
             {adminName}
           </span>
           <button
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)] disabled:opacity-60"
+            className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)] disabled:opacity-60 md:flex"
             disabled={isLoggingOut}
             onClick={onLogout}
             type="button"
           >
             <Icon className="size-4" name="logout" />
             로그아웃
+          </button>
+          {/* 좁은 화면: 오른쪽 햄버거 버튼으로 메뉴(로그아웃 포함)를 연다. */}
+          <button
+            aria-controls={drawerId}
+            aria-expanded={isMenuOpen}
+            aria-label="메뉴 열기"
+            className={`${ICON_BUTTON_CLASS_NAME} md:hidden`}
+            onClick={() => setIsMenuOpen(true)}
+            ref={openButtonRef}
+            type="button"
+          >
+            <Icon name="menu" />
           </button>
         </div>
       </header>
@@ -126,8 +128,8 @@ export function AdminShell({
         ) : null}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 bg-[var(--surface)] shadow-xl transition-[translate,visibility] duration-200 md:visible md:sticky md:top-14 md:bottom-auto md:z-auto md:h-[calc(100vh-3.5rem)] md:w-60 md:shrink-0 md:translate-x-0 md:border-r md:border-[var(--line)] md:shadow-none md:transition-none ${
-            isMenuOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
+          className={`fixed inset-y-0 right-0 z-40 flex w-72 max-w-[85vw] flex-col bg-[var(--surface)] shadow-xl transition-[translate,visibility] duration-200 md:visible md:sticky md:top-14 md:right-auto md:bottom-auto md:z-auto md:h-[calc(100vh-3.5rem)] md:w-60 md:max-w-none md:shrink-0 md:translate-x-0 md:border-r md:border-[var(--line)] md:shadow-none md:transition-none ${
+            isMenuOpen ? 'visible translate-x-0' : 'invisible translate-x-full'
           }`}
           id={drawerId}
         >
@@ -146,7 +148,7 @@ export function AdminShell({
             </button>
           </div>
 
-          <nav aria-label="메인 메뉴" className="px-3 py-3">
+          <nav aria-label="메인 메뉴" className="flex-1 overflow-y-auto px-3 py-3">
             <ul className="flex flex-col gap-1">
               {menuItems.map((item) => {
                 const isActive = isActivePath(pathname, item.href);
@@ -171,6 +173,20 @@ export function AdminShell({
               })}
             </ul>
           </nav>
+
+          {/* 좁은 화면 전용: 메뉴 맨 아래에 관리자 이름과 로그아웃. */}
+          <div className="border-t border-[var(--line)] px-3 py-3 md:hidden">
+            <p className="truncate px-3 pb-2 text-sm text-[var(--muted)]">{adminName}</p>
+            <button
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)] disabled:opacity-60"
+              disabled={isLoggingOut}
+              onClick={onLogout}
+              type="button"
+            >
+              <Icon name="logout" />
+              로그아웃
+            </button>
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1">{children}</main>
