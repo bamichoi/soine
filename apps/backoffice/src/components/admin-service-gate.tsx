@@ -2,14 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import { AdminShell } from '@/components/admin-shell';
 import {
-  ADMIN_SERVICE_LABELS,
   AdminApiError,
   type AdminProfile,
   type AdminService,
   getCurrentAdmin,
   logoutAdmin,
 } from '@/lib/admin-auth-api';
+import { ADMIN_MENUS } from '@/lib/admin-menu';
 
 type AdminServiceGateProps = {
   service: AdminService;
@@ -75,24 +76,14 @@ export function AdminServiceGate({ service, children }: AdminServiceGateProps) {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3">
-        <span className="text-sm font-semibold text-[var(--brand)]">
-          {ADMIN_SERVICE_LABELS[service]}
-        </span>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-[var(--muted)]">{admin.name}</span>
-          <button
-            className="rounded-md px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand-strong)] disabled:opacity-60"
-            disabled={isLoggingOut}
-            onClick={handleLogout}
-            type="button"
-          >
-            로그아웃
-          </button>
-        </div>
-      </header>
+    <AdminShell
+      adminName={admin.name}
+      isLoggingOut={isLoggingOut}
+      menuItems={ADMIN_MENUS[service]}
+      onLogout={handleLogout}
+      service={service}
+    >
       {children}
-    </div>
+    </AdminShell>
   );
 }

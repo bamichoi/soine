@@ -3,7 +3,20 @@ import type { CSSProperties } from 'react';
 // 아이콘 원본은 public/icons/<name>.svg 에 둔다. 코드에 SVG를 직접 넣지 않는다.
 // 파일을 마스크로 써서 글자색(currentColor)을 따라가므로 hover 색 변경 등이 그대로 적용된다.
 // 새 아이콘은 파일을 추가하고 아래 목록에 이름을 등록한다.
-const ICON_NAMES = ['eye', 'eye-off'] as const;
+const ICON_NAMES = [
+  'calendar',
+  'chart-bar',
+  'chevron-right',
+  'clipboard-check',
+  'eye',
+  'eye-off',
+  'logout',
+  'menu',
+  'megaphone',
+  'message',
+  'sparkles',
+  'x',
+] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
 
