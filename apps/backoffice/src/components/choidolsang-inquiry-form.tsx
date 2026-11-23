@@ -2,19 +2,24 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   CREATABLE_INQUIRY_STATUSES,
   type CreateInquiryInput,
   createInquiry,
+  getInquiry,
   getSeoulToday,
   INQUIRY_CONTENT_MAX_LENGTH,
   INQUIRY_SHORT_TEXT_MAX_LENGTH,
   INQUIRY_STATUS_LABELS,
+  type InquiryDetail,
   type InquiryStatus,
   REJECTION_REASON_MAX_LENGTH,
+  toSeoulDateAndTime,
+  type UpdateInquiryInput,
+  updateInquiry,
 } from '@/lib/choidolsang-inquiries-api';
 
 const LIST_PATH = '/choidolsang/inquiries';
@@ -109,20 +114,60 @@ function buildCreateInput(values: FormValues): CreateInquiryInput | string {
   };
 }
 
-export function ChoidolsangInquiryForm() {
+function toUpdateInput(input: CreateInquiryInput, isRejected: boolean): UpdateInquiryInput {
+  const fields = {
+    desiredConcept: input.desiredConcept,
+    desiredReservationAt: input.desiredReservationAt,
+    location: input.location,
+  };
+
+  return isRejected && input.rejectionReason
+    ? { ...fields, rejectionReason: input.rejectionReason }
+    : fields;
+}
+
+function getSubmitErrorMessage(error: unknown): string {
+  if (error instanceof AdminApiError && error.status === 400) {
+    return '입력한 내용을 다시 확인해 주세요.';
+  }
+
+  if (error instanceof AdminApiError && error.status === 409) {
+    return '그사이 문의 상태가 바뀌었습니다. 새로고침 후 다시 수정해 주세요.';
+  }
+
+  if (error instanceof AdminApiError && error.status === 404) {
+    return '삭제되었거나 없는 문의입니다.';
+  }
+
+  return '문의를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+}
+
+type ChoidolsangInquiryFormProps = {
+  /** 있으면 수정 폼. 상태는 고칠 수 없고, 거절된 문의만 거절 사유를 고친다. */
+  inquiry?: InquiryDetail;
+};
+
+export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const listQuery = searchParams.toString();
-  const listHref = listQuery ? `${LIST_PATH}?${listQuery}` : LIST_PATH;
+  const querySuffix = listQuery ? `?${listQuery}` : '';
+  const isEdit = inquiry !== undefined;
+  const cancelHref = isEdit
+    ? `${LIST_PATH}/${inquiry.code}${querySuffix}`
+    : `${LIST_PATH}${querySuffix}`;
+  const initialReservation = inquiry?.desiredReservationAt
+    ? toSeoulDateAndTime(inquiry.desiredReservationAt)
+    : { date: '', time: '' };
   const idPrefix = useId();
-  const [inquiredOn, setInquiredOn] = useState(getSeoulToday);
-  const [content, setContent] = useState('');
-  const [reservationDate, setReservationDate] = useState('');
-  const [reservationTime, setReservationTime] = useState('');
-  const [location, setLocation] = useState('');
-  const [desiredConcept, setDesiredConcept] = useState('');
-  const [status, setStatus] = useState<InquiryStatus>('pending');
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [inquiredOn, setInquiredOn] = useState(() => inquiry?.inquiredOn ?? getSeoulToday());
+  const [content, setContent] = useState(inquiry?.content ?? '');
+  const [reservationDate, setReservationDate] = useState(initialReservation.date);
+  const [reservationTime, setReservationTime] = useState(initialReservation.time);
+  const [location, setLocation] = useState(inquiry?.location ?? '');
+  const [desiredConcept, setDesiredConcept] = useState(inquiry?.desiredConcept ?? '');
+  const [status, setStatus] = useState<InquiryStatus>(inquiry?.status ?? 'pending');
+  const [rejectionReason, setRejectionReason] = useState(inquiry?.rejectionReason ?? '');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -148,14 +193,12 @@ export function ChoidolsangInquiryForm() {
     setIsSubmitting(true);
 
     try {
-      const inquiry = await createInquiry(result);
-      router.push(`${LIST_PATH}/${inquiry.code}${listQuery ? `?${listQuery}` : ''}`);
+      const saved = isEdit
+        ? await updateInquiry(inquiry.code, toUpdateInput(result, status === 'rejected'))
+        : await createInquiry(result);
+      router.push(`${LIST_PATH}/${saved.code}${querySuffix}`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof AdminApiError && error.status === 400
-          ? '입력한 내용을 다시 확인해 주세요.'
-          : '문의를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      );
+      setErrorMessage(getSubmitErrorMessage(error));
       setIsSubmitting(false);
     }
   }
@@ -164,40 +207,45 @@ export function ChoidolsangInquiryForm() {
 
   return (
     <form
-      aria-label="문의 추가"
+      aria-label={isEdit ? '문의 수정' : '문의 추가'}
       className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-5" disabled={isSubmitting}>
         <legend className="sr-only">문의 정보</legend>
 
-        <Field htmlFor={id('inquired-on')} label="문의 날짜" required>
-          <input
-            className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
-            id={id('inquired-on')}
-            onChange={(event) => setInquiredOn(event.target.value)}
-            required
-            type="date"
-            value={inquiredOn}
-          />
-        </Field>
+        {/* 수정할 때 문의 날짜·내용은 상세의 문의 내용 로그에서 기록별로 고친다. */}
+        {isEdit ? null : (
+          <>
+            <Field htmlFor={id('inquired-on')} label="문의 날짜" required>
+              <input
+                className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
+                id={id('inquired-on')}
+                onChange={(event) => setInquiredOn(event.target.value)}
+                required
+                type="date"
+                value={inquiredOn}
+              />
+            </Field>
 
-        <Field
-          hint={`${content.length.toLocaleString()} / ${INQUIRY_CONTENT_MAX_LENGTH.toLocaleString()}자`}
-          htmlFor={id('content')}
-          label="문의 내용"
-          required
-        >
-          <textarea
-            className={`${CONTROL_CLASS_NAME} min-h-40 resize-y py-2.5 leading-relaxed`}
-            id={id('content')}
-            maxLength={INQUIRY_CONTENT_MAX_LENGTH}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder="고객이 남긴 문의 내용을 입력해 주세요."
-            required
-            value={content}
-          />
-        </Field>
+            <Field
+              hint={`${content.length.toLocaleString()} / ${INQUIRY_CONTENT_MAX_LENGTH.toLocaleString()}자`}
+              htmlFor={id('content')}
+              label="문의 내용"
+              required
+            >
+              <textarea
+                className={`${CONTROL_CLASS_NAME} min-h-40 resize-y py-2.5 leading-relaxed`}
+                id={id('content')}
+                maxLength={INQUIRY_CONTENT_MAX_LENGTH}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="고객이 남긴 문의 내용을 입력해 주세요."
+                required
+                value={content}
+              />
+            </Field>
+          </>
+        )}
 
         <Field
           hint="날짜와 시간을 함께 입력해 주세요. 한국 시간 기준입니다."
@@ -244,26 +292,28 @@ export function ChoidolsangInquiryForm() {
           />
         </Field>
 
-        <Field htmlFor={id('status')} label="상태" required>
-          <div className="relative sm:w-48">
-            <select
-              className={`${CONTROL_CLASS_NAME} h-10 appearance-none pr-9`}
-              id={id('status')}
-              onChange={(event) => setStatus(event.target.value as InquiryStatus)}
-              value={status}
-            >
-              {CREATABLE_INQUIRY_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {INQUIRY_STATUS_LABELS[value]}
-                </option>
-              ))}
-            </select>
-            <Icon
-              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-              name="chevron-down"
-            />
-          </div>
-        </Field>
+        {isEdit ? null : (
+          <Field htmlFor={id('status')} label="상태" required>
+            <div className="relative sm:w-48">
+              <select
+                className={`${CONTROL_CLASS_NAME} h-10 appearance-none pr-9`}
+                id={id('status')}
+                onChange={(event) => setStatus(event.target.value as InquiryStatus)}
+                value={status}
+              >
+                {CREATABLE_INQUIRY_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {INQUIRY_STATUS_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+              <Icon
+                className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+                name="chevron-down"
+              />
+            </div>
+          </Field>
+        )}
 
         {status === 'rejected' ? (
           <Field
@@ -294,7 +344,7 @@ export function ChoidolsangInquiryForm() {
         <div className="flex justify-end gap-2">
           <Link
             className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={listHref}
+            href={cancelHref}
           >
             취소
           </Link>
@@ -309,4 +359,58 @@ export function ChoidolsangInquiryForm() {
       </footer>
     </form>
   );
+}
+
+type EditLoadState =
+  | { kind: 'loading' }
+  | { kind: 'not-found' }
+  | { kind: 'error' }
+  | { kind: 'loaded'; inquiry: InquiryDetail };
+
+/** 문의를 불러와 수정 폼을 보여 준다. */
+export function ChoidolsangInquiryEditForm({ code }: { code: string }) {
+  const [state, setState] = useState<EditLoadState>({ kind: 'loading' });
+
+  useEffect(() => {
+    let isActive = true;
+    setState({ kind: 'loading' });
+
+    getInquiry(code)
+      .then((inquiry) => {
+        if (isActive) {
+          setState({ inquiry, kind: 'loaded' });
+        }
+      })
+      .catch((error: unknown) => {
+        if (isActive) {
+          setState(
+            error instanceof AdminApiError && error.status === 404
+              ? { kind: 'not-found' }
+              : { kind: 'error' },
+          );
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [code]);
+
+  if (state.kind === 'loading') {
+    return <p className="py-10 text-sm text-[var(--muted)]">문의를 불러오고 있습니다.</p>;
+  }
+
+  if (state.kind === 'not-found') {
+    return <p className="py-10 text-sm text-[var(--muted)]">해당 문의를 찾을 수 없습니다.</p>;
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <p className="py-10 text-sm text-[var(--error)]" role="alert">
+        문의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+      </p>
+    );
+  }
+
+  return <ChoidolsangInquiryForm inquiry={state.inquiry} />;
 }

@@ -1,18 +1,21 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   type ChoidolsangInquiry,
+  type ChoidolsangInquiryRecord,
   type ChoidolsangInquiryStatus,
   Prisma,
 } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import type { CreateInquiryDto } from './dto/create-inquiry.dto';
+import type { CreateInquiryDto, InquiryOptionalFieldsDto } from './dto/create-inquiry.dto';
+import type { InquiryRecordDto } from './dto/inquiry-record.dto';
 import type {
   InquirySearchField,
   InquirySortField,
   ListInquiriesQueryDto,
   SortOrder,
 } from './dto/list-inquiries-query.dto';
+import type { UpdateInquiryDto } from './dto/update-inquiry.dto';
 import { generateInquiryCode, normalizeInquiryCode } from './inquiry-code';
 
 export const INQUIRY_PAGE_SIZE = 20;
@@ -31,6 +34,7 @@ export type InquiryListItem = {
   code: string;
   /** 문의 날짜 (YYYY-MM-DD) */
   inquiredOn: string;
+  /** 첫 문의 내용 (로그 첫 기록) */
   content: string;
   /** 희망 예약 일시 (ISO 8601), 없으면 null */
   desiredReservationAt: string | null;
@@ -39,7 +43,18 @@ export type InquiryListItem = {
   status: ChoidolsangInquiryStatus;
 };
 
+/** 문의 내용 로그의 기록 하나. 첫 기록이 첫 문의다. */
+export type InquiryRecord = {
+  id: string;
+  /** 기록 날짜 (YYYY-MM-DD) */
+  recordedOn: string;
+  content: string;
+  createdAt: string;
+};
+
 export type InquiryDetail = InquiryListItem & {
+  /** 문의 내용 로그. 기록 날짜, 등록 순으로 오래된 것부터. */
+  records: InquiryRecord[];
   /** 거절 사유. 거절 상태일 때만 값이 있다. */
   rejectionReason: string | null;
   createdAt: string;
@@ -76,6 +91,11 @@ function buildFieldCondition(field: Exclude<InquirySearchField, 'all'>, query: s
     }
     case 'status':
       return { status: { in: matchStatuses(query) } } satisfies InquiryWhere;
+    case 'content':
+      // 문의 내용은 로그의 모든 기록에서 찾는다.
+      return {
+        records: { some: { content: { contains: query, mode: 'insensitive' } } },
+      } satisfies InquiryWhere;
     default:
       return { [field]: { contains: query, mode: 'insensitive' } } satisfies InquiryWhere;
   }
@@ -114,27 +134,73 @@ export function buildInquiryOrderBy(sort: InquirySortField, order: SortOrder): I
   return [primary, { createdAt: 'desc' }];
 }
 
-function toListItem(inquiry: ChoidolsangInquiry): InquiryListItem {
+// 로그는 기록 날짜, 같은 날짜면 등록 순으로 오래된 것부터 쌓는다. 첫 기록이 첫 문의다.
+const RECORD_ORDER = [
+  { recordedOn: 'asc' },
+  { createdAt: 'asc' },
+] satisfies Prisma.ChoidolsangInquiryRecordOrderByWithRelationInput[];
+
+type InquiryWithRecords = ChoidolsangInquiry & { records: ChoidolsangInquiryRecord[] };
+
+// DATE 컬럼은 UTC 자정으로 읽히므로 날짜 부분만 쓴다.
+function toDateString(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+// 날짜만 저장하는 DATE 컬럼은 UTC 자정으로 넣어 그대로 들어가게 한다.
+function toDateOnly(date: string): Date {
+  return new Date(`${date}T00:00:00.000Z`);
+}
+
+function toListItem(inquiry: InquiryWithRecords): InquiryListItem {
   return {
     code: inquiry.code,
-    content: inquiry.content,
+    content: inquiry.records[0]?.content ?? '',
     desiredConcept: inquiry.desiredConcept,
     desiredReservationAt: inquiry.desiredReservationAt?.toISOString() ?? null,
     id: inquiry.id,
-    // DATE 컬럼은 UTC 자정으로 읽히므로 날짜 부분만 쓴다.
-    inquiredOn: inquiry.inquiredOn.toISOString().slice(0, 10),
+    inquiredOn: toDateString(inquiry.inquiredOn),
     location: inquiry.location,
     status: inquiry.status,
   };
 }
 
-function toDetail(inquiry: ChoidolsangInquiry): InquiryDetail {
+function toRecord(record: ChoidolsangInquiryRecord): InquiryRecord {
+  return {
+    content: record.content,
+    createdAt: record.createdAt.toISOString(),
+    id: record.id,
+    recordedOn: toDateString(record.recordedOn),
+  };
+}
+
+function toDetail(inquiry: InquiryWithRecords): InquiryDetail {
   return {
     ...toListItem(inquiry),
     createdAt: inquiry.createdAt.toISOString(),
+    records: inquiry.records.map(toRecord),
     rejectionReason: inquiry.rejectionReason,
     updatedAt: inquiry.updatedAt.toISOString(),
   };
+}
+
+// 숨김 삭제한 문의는 어디서도 보이지 않는다.
+const NOT_DELETED = { deletedAt: null } satisfies InquiryWhere;
+
+function toOptionalFieldData(input: InquiryOptionalFieldsDto) {
+  return {
+    desiredConcept: input.desiredConcept ?? null,
+    desiredReservationAt: input.desiredReservationAt ? new Date(input.desiredReservationAt) : null,
+    location: input.location ?? null,
+  };
+}
+
+function inquiryNotFound() {
+  return new NotFoundException('Inquiry not found');
+}
+
+function recordNotFound() {
+  return new NotFoundException('Inquiry record not found');
 }
 
 function isUniqueCodeViolation(error: unknown): boolean {
@@ -144,6 +210,8 @@ function isUniqueCodeViolation(error: unknown): boolean {
     JSON.stringify(error.meta ?? {}).includes('code')
   );
 }
+
+type Transaction = Prisma.TransactionClient;
 
 @Injectable()
 export class ChoidolsangInquiriesService {
@@ -156,10 +224,12 @@ export class ChoidolsangInquiriesService {
     q = '',
     sort = 'inquiredOn',
   }: ListInquiriesQueryDto = {}): Promise<InquiryListResponse> {
-    const where = buildInquiryWhere(field, q);
+    const where = { ...buildInquiryWhere(field, q), ...NOT_DELETED };
     const [total, inquiries] = await this.prisma.$transaction([
       this.prisma.choidolsangInquiry.count({ where }),
       this.prisma.choidolsangInquiry.findMany({
+        // 목록의 문의 내용은 첫 기록(첫 문의)만 보여 준다.
+        include: { records: { orderBy: RECORD_ORDER, take: 1 } },
         orderBy: buildInquiryOrderBy(sort, order),
         skip: (page - 1) * INQUIRY_PAGE_SIZE,
         take: INQUIRY_PAGE_SIZE,
@@ -180,27 +250,22 @@ export class ChoidolsangInquiriesService {
 
   async findByCode(rawCode: string): Promise<InquiryDetail> {
     const code = normalizeInquiryCode(rawCode);
-    const inquiry = code
-      ? await this.prisma.choidolsangInquiry.findUnique({ where: { code } })
-      : null;
+    const inquiry = code ? await this.findActive(code) : null;
 
     if (!inquiry) {
-      throw new NotFoundException('Inquiry not found');
+      throw inquiryNotFound();
     }
 
     return toDetail(inquiry);
   }
 
+  /** 문의를 추가한다. 문의 내용은 로그의 첫 기록으로, 문의 날짜는 그 기록 날짜로 저장한다. */
   async create(input: CreateInquiryDto): Promise<InquiryDetail> {
+    const inquiredOn = toDateOnly(input.inquiredOn);
     const data = {
-      content: input.content,
-      desiredConcept: input.desiredConcept ?? null,
-      desiredReservationAt: input.desiredReservationAt
-        ? new Date(input.desiredReservationAt)
-        : null,
-      // 문의 날짜는 날짜만 저장한다. UTC 자정으로 넣어 DATE 컬럼에 그대로 들어가게 한다.
-      inquiredOn: new Date(`${input.inquiredOn}T00:00:00.000Z`),
-      location: input.location ?? null,
+      ...toOptionalFieldData(input),
+      inquiredOn,
+      records: { create: [{ content: input.content, recordedOn: inquiredOn }] },
       rejectionReason: input.status === 'rejected' ? (input.rejectionReason ?? null) : null,
       status: input.status ?? 'pending',
     };
@@ -210,6 +275,7 @@ export class ChoidolsangInquiriesService {
       try {
         const inquiry = await this.prisma.choidolsangInquiry.create({
           data: { ...data, code: generateInquiryCode() },
+          include: { records: { orderBy: RECORD_ORDER } },
         });
 
         return toDetail(inquiry);
@@ -218,6 +284,91 @@ export class ChoidolsangInquiriesService {
           throw error;
         }
       }
+    }
+  }
+
+  /**
+   * 문의의 선택 항목(희망 예약일시·장소·컨셉)을 고친다. 상태와 문의 내용 로그는 바꾸지 않는다.
+   * 거절 사유는 거절된 문의일 때만 고치며, 보내지 않으면 그대로 둔다.
+   */
+  async update(rawCode: string, input: UpdateInquiryDto): Promise<InquiryDetail> {
+    const { code, inquiry } = await this.requireActive(rawCode);
+    const data = {
+      ...toOptionalFieldData(input),
+      ...(inquiry.status === 'rejected' && input.rejectionReason
+        ? { rejectionReason: input.rejectionReason }
+        : {}),
+    };
+
+    // 읽은 뒤 상태가 바뀌었다면(예: 그사이 거절) 덮어쓰지 않도록 읽은 상태를 조건으로 건다.
+    const { count } = await this.prisma.choidolsangInquiry.updateMany({
+      data,
+      where: { code, status: inquiry.status, ...NOT_DELETED },
+    });
+
+    if (count === 0) {
+      throw new ConflictException('Inquiry changed while editing');
+    }
+
+    return this.findByCode(code);
+  }
+
+  /** 문의 내용 로그에 기록을 덧붙인다. */
+  addRecord(rawCode: string, input: InquiryRecordDto): Promise<InquiryDetail> {
+    return this.changeRecords(rawCode, async (tx, inquiryId) => {
+      await tx.choidolsangInquiryRecord.create({
+        data: { content: input.content, inquiryId, recordedOn: toDateOnly(input.recordedOn) },
+      });
+    });
+  }
+
+  /** 기록 하나를 고친다. 다른 문의의 기록은 고칠 수 없다. */
+  updateRecord(rawCode: string, recordId: string, input: InquiryRecordDto): Promise<InquiryDetail> {
+    return this.changeRecords(rawCode, async (tx, inquiryId) => {
+      const { count } = await tx.choidolsangInquiryRecord.updateMany({
+        data: { content: input.content, recordedOn: toDateOnly(input.recordedOn) },
+        where: { id: recordId, inquiryId },
+      });
+
+      if (count === 0) {
+        throw recordNotFound();
+      }
+    });
+  }
+
+  /** 기록 하나를 완전히 지운다. 문의에는 기록이 하나 이상 남아야 한다. */
+  removeRecord(rawCode: string, recordId: string): Promise<InquiryDetail> {
+    return this.changeRecords(rawCode, async (tx, inquiryId) => {
+      const remaining = await tx.choidolsangInquiryRecord.count({ where: { inquiryId } });
+      const { count } = await tx.choidolsangInquiryRecord.deleteMany({
+        where: { id: recordId, inquiryId },
+      });
+
+      if (count === 0) {
+        throw recordNotFound();
+      }
+
+      if (remaining <= 1) {
+        throw new ConflictException('An inquiry must keep at least one record');
+      }
+    });
+  }
+
+  /** 문의를 숨김 삭제한다. 행은 남기고 deletedAt만 기록한다. */
+  async remove(rawCode: string): Promise<void> {
+    const code = normalizeInquiryCode(rawCode);
+
+    if (!code) {
+      throw inquiryNotFound();
+    }
+
+    const { count } = await this.prisma.choidolsangInquiry.updateMany({
+      data: { deletedAt: new Date() },
+      where: { code, ...NOT_DELETED },
+    });
+
+    if (count === 0) {
+      throw inquiryNotFound();
     }
   }
 
@@ -240,17 +391,17 @@ export class ChoidolsangInquiriesService {
     const code = normalizeInquiryCode(rawCode);
 
     if (!code) {
-      throw new NotFoundException('Inquiry not found');
+      throw inquiryNotFound();
     }
 
     const { count } = await this.prisma.choidolsangInquiry.updateMany({
       data,
-      where: { code, status: from },
+      where: { code, status: from, ...NOT_DELETED },
     });
-    const inquiry = await this.prisma.choidolsangInquiry.findUnique({ where: { code } });
+    const inquiry = await this.findActive(code);
 
     if (!inquiry) {
-      throw new NotFoundException('Inquiry not found');
+      throw inquiryNotFound();
     }
 
     if (count === 0) {
@@ -258,5 +409,53 @@ export class ChoidolsangInquiriesService {
     }
 
     return toDetail(inquiry);
+  }
+
+  /**
+   * 기록을 바꾸고 문의 날짜를 첫 기록 날짜에 맞춘다.
+   * 같은 문의의 기록 변경이 겹치지 않도록 문의 행을 잠근 채 한 트랜잭션으로 처리한다.
+   */
+  private async changeRecords(
+    rawCode: string,
+    change: (tx: Transaction, inquiryId: string) => Promise<void>,
+  ): Promise<InquiryDetail> {
+    const { code, inquiry } = await this.requireActive(rawCode);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "choidolsang"."inquiries" WHERE "id" = ${inquiry.id}::uuid FOR UPDATE`;
+      await change(tx, inquiry.id);
+
+      const first = await tx.choidolsangInquiryRecord.findFirst({
+        orderBy: RECORD_ORDER,
+        where: { inquiryId: inquiry.id },
+      });
+
+      if (first) {
+        await tx.choidolsangInquiry.update({
+          data: { inquiredOn: first.recordedOn },
+          where: { id: inquiry.id },
+        });
+      }
+    });
+
+    return this.findByCode(code);
+  }
+
+  private async requireActive(rawCode: string) {
+    const code = normalizeInquiryCode(rawCode);
+    const inquiry = code ? await this.findActive(code) : null;
+
+    if (!(code && inquiry)) {
+      throw inquiryNotFound();
+    }
+
+    return { code, inquiry };
+  }
+
+  private findActive(code: string) {
+    return this.prisma.choidolsangInquiry.findFirst({
+      include: { records: { orderBy: RECORD_ORDER } },
+      where: { code, ...NOT_DELETED },
+    });
   }
 }

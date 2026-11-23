@@ -1,6 +1,10 @@
 'use client';
 
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import { InquiryContentLog } from '@/components/inquiry-content-log';
+import { InquiryDeleteDialog } from '@/components/inquiry-delete-dialog';
 import { InquiryRejectDialog } from '@/components/inquiry-reject-dialog';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
 import { AdminApiError } from '@/lib/admin-auth-api';
@@ -23,6 +27,8 @@ const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
 const SECONDARY_BUTTON_CLASS_NAME =
   'h-10 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50';
 
+const LIST_PATH = '/choidolsang/inquiries';
+
 const STALE_STATUS_MESSAGE = '이미 처리된 문의입니다. 화면을 새로고침해 주세요.';
 
 function InfoItem({ label, children }: { label: string; children: ReactNode }) {
@@ -34,7 +40,7 @@ function InfoItem({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function InquiryBody({ inquiry }: { inquiry: InquiryDetail }) {
+function InquiryBody({ inquiry, onChange }: InquiryActionsProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-3">
@@ -45,9 +51,7 @@ function InquiryBody({ inquiry }: { inquiry: InquiryDetail }) {
         <InquiryStatusBadge status={inquiry.status} />
       </header>
 
-      <section aria-label="문의 내용" className="bg-[var(--background)] px-5 py-4">
-        <p className="text-[15px] leading-7 break-words whitespace-pre-wrap">{inquiry.content}</p>
-      </section>
+      <InquiryContentLog inquiry={inquiry} onChange={onChange} />
 
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         <InfoItem label="문의 날짜">{formatInquiryDate(inquiry.inquiredOn)}</InfoItem>
@@ -80,14 +84,30 @@ type InquiryActionsProps = {
   onChange: (inquiry: InquiryDetail) => void;
 };
 
-// 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정·취소: 버튼 없음
-function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
+const PRIMARY_BUTTON_CLASS_NAME =
+  'h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-50';
+
+// 상태별 버튼 — 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정: [예약 정보] / 취소: 없음
+function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  if (inquiry.status === 'confirmed' || inquiry.status === 'cancelled') {
+  if (inquiry.status === 'cancelled') {
     return null;
+  }
+
+  if (inquiry.status === 'confirmed') {
+    return (
+      <button
+        className={PRIMARY_BUTTON_CLASS_NAME}
+        disabled
+        title="예약 기능은 준비 중입니다."
+        type="button"
+      >
+        예약 정보
+      </button>
+    );
   }
 
   async function handleReopen() {
@@ -108,13 +128,13 @@ function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
   }
 
   return (
-    <footer className="flex flex-col gap-3 border-t border-[var(--line)] px-6 py-4">
+    <div className="flex flex-col items-end gap-3">
       {errorMessage ? (
         <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
           {errorMessage}
         </p>
       ) : null}
-      <div className="flex justify-end gap-2">
+      <div className="flex gap-2">
         {inquiry.status === 'pending' ? (
           <button
             className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
@@ -134,7 +154,7 @@ function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
           </button>
         )}
         <button
-          className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          className={PRIMARY_BUTTON_CLASS_NAME}
           disabled
           title="예약 폼은 준비 중입니다."
           type="button"
@@ -151,6 +171,44 @@ function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
           setIsRejectOpen(false);
           onChange(rejected);
         }}
+      />
+    </div>
+  );
+}
+
+// 왼쪽: [수정] [삭제] / 오른쪽: 상태별 버튼
+function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const listQuery = searchParams.toString();
+  const querySuffix = listQuery ? `?${listQuery}` : '';
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  return (
+    <footer className="flex flex-wrap items-start justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
+      <div className="flex gap-2">
+        <Link
+          className={`${SECONDARY_BUTTON_CLASS_NAME} flex items-center`}
+          href={`${LIST_PATH}/${inquiry.code}/edit${querySuffix}`}
+        >
+          수정
+        </Link>
+        <button
+          className={SECONDARY_BUTTON_CLASS_NAME}
+          onClick={() => setIsDeleteOpen(true)}
+          type="button"
+        >
+          삭제
+        </button>
+      </div>
+
+      <StatusActions inquiry={inquiry} onChange={onChange} />
+
+      <InquiryDeleteDialog
+        code={inquiry.code}
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onDeleted={() => router.push(`${LIST_PATH}${querySuffix}`)}
       />
     </footer>
   );
@@ -200,13 +258,12 @@ export function ChoidolsangInquiryDetail({ code }: { code: string }) {
     );
   }
 
+  const handleChange = (inquiry: InquiryDetail) => setState({ inquiry, kind: 'loaded' });
+
   return (
     <article className="flex flex-col border border-[var(--line)] bg-[var(--surface)]">
-      <InquiryBody inquiry={state.inquiry} />
-      <InquiryActions
-        inquiry={state.inquiry}
-        onChange={(inquiry) => setState({ inquiry, kind: 'loaded' })}
-      />
+      <InquiryBody inquiry={state.inquiry} onChange={handleChange} />
+      <InquiryActions inquiry={state.inquiry} onChange={handleChange} />
     </article>
   );
 }

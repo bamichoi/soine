@@ -1,3 +1,4 @@
+import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import {
   IsIn,
@@ -32,18 +33,23 @@ function trimToNull({ value }: { value: unknown }) {
   return trimmed === '' ? null : trimmed;
 }
 
-export class CreateInquiryDto {
-  /** 문의 날짜 (YYYY-MM-DD) */
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  @IsISO8601({ strict: true })
-  inquiredOn!: string;
+/** 날짜만 받는 항목 (YYYY-MM-DD) */
+export function DateOnlyField() {
+  return applyDecorators(Matches(/^\d{4}-\d{2}-\d{2}$/), IsISO8601({ strict: true }));
+}
 
-  @Transform(trimString)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(INQUIRY_CONTENT_MAX_LENGTH)
-  content!: string;
+/** 문의·기록 내용 (필수, 앞뒤 공백 제거) */
+export function InquiryContentField() {
+  return applyDecorators(
+    Transform(trimString),
+    IsString(),
+    IsNotEmpty(),
+    MaxLength(INQUIRY_CONTENT_MAX_LENGTH),
+  );
+}
 
+/** 문의 추가·수정에 공통으로 쓰는 선택 항목. 문의 날짜·내용은 로그에서 따로 고친다. */
+export class InquiryOptionalFieldsDto {
   /** 희망 예약 일시 (시간대 포함 ISO 8601) */
   @IsOptional()
   @Transform(trimToNull)
@@ -62,6 +68,15 @@ export class CreateInquiryDto {
   @IsString()
   @MaxLength(INQUIRY_SHORT_TEXT_MAX_LENGTH)
   desiredConcept?: string | null;
+}
+
+export class CreateInquiryDto extends InquiryOptionalFieldsDto {
+  /** 문의 날짜 (YYYY-MM-DD) */
+  @DateOnlyField()
+  inquiredOn!: string;
+
+  @InquiryContentField()
+  content!: string;
 
   @IsOptional()
   @IsIn(INQUIRY_STATUSES)

@@ -31,7 +31,18 @@ export type Inquiry = {
   status: InquiryStatus;
 };
 
+/** 문의 내용 로그의 기록 하나. 첫 기록이 첫 문의다. */
+export type InquiryRecord = {
+  id: string;
+  /** 기록 날짜 (YYYY-MM-DD) */
+  recordedOn: string;
+  content: string;
+  createdAt: string;
+};
+
 export type InquiryDetail = Inquiry & {
+  /** 문의 내용 로그. 오래된 것부터. */
+  records: InquiryRecord[];
   /** 거절 사유. 거절 상태일 때만 값이 있다. */
   rejectionReason: string | null;
   createdAt: string;
@@ -216,6 +227,99 @@ export async function reopenInquiry(code: string): Promise<InquiryDetail> {
     `choidolsang/inquiries/${encodeURIComponent(code)}/reopen`,
     { method: 'POST' },
   );
+
+  return (await response.json()) as InquiryDetail;
+}
+
+/**
+ * 문의 수정. 상태와 문의 날짜·내용(로그)은 바꾸지 않는다.
+ * 거절 사유는 거절된 문의일 때만 보낸다.
+ */
+export type UpdateInquiryInput = Pick<
+  CreateInquiryInput,
+  'desiredReservationAt' | 'location' | 'desiredConcept'
+> & {
+  rejectionReason?: string;
+};
+
+export async function updateInquiry(
+  code: string,
+  input: UpdateInquiryInput,
+): Promise<InquiryDetail> {
+  const response = await requestAdminApi(`choidolsang/inquiries/${encodeURIComponent(code)}`, {
+    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH',
+  });
+
+  return (await response.json()) as InquiryDetail;
+}
+
+/** 문의를 숨김 삭제한다. 목록과 상세에서 더는 보이지 않는다. */
+export async function deleteInquiry(code: string): Promise<void> {
+  await requestAdminApi(`choidolsang/inquiries/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+  });
+}
+
+/** ISO 일시 → 한국 시간 날짜(YYYY-MM-DD)와 시각(HH:mm). 수정 폼 입력값에 쓴다. */
+export function toSeoulDateAndTime(isoDateTime: string): { date: string; time: string } {
+  const parts = Object.fromEntries(
+    seoulDateTimeFormatter
+      .formatToParts(new Date(isoDateTime))
+      .map((part) => [part.type, part.value]),
+  );
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+  };
+}
+
+export type InquiryRecordInput = {
+  recordedOn: string;
+  content: string;
+};
+
+/** 문의 내용 로그에 기록을 덧붙인다. */
+export async function addInquiryRecord(
+  code: string,
+  input: InquiryRecordInput,
+): Promise<InquiryDetail> {
+  const response = await requestAdminApi(
+    `choidolsang/inquiries/${encodeURIComponent(code)}/records`,
+    {
+      body: JSON.stringify(input),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+
+  return (await response.json()) as InquiryDetail;
+}
+
+function recordPath(code: string, recordId: string): string {
+  return `choidolsang/inquiries/${encodeURIComponent(code)}/records/${encodeURIComponent(recordId)}`;
+}
+
+/** 로그의 기록 하나를 고친다. */
+export async function updateInquiryRecord(
+  code: string,
+  recordId: string,
+  input: InquiryRecordInput,
+): Promise<InquiryDetail> {
+  const response = await requestAdminApi(recordPath(code, recordId), {
+    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH',
+  });
+
+  return (await response.json()) as InquiryDetail;
+}
+
+/** 로그의 기록 하나를 완전히 지운다. 마지막 남은 기록은 지울 수 없다(409). */
+export async function deleteInquiryRecord(code: string, recordId: string): Promise<InquiryDetail> {
+  const response = await requestAdminApi(recordPath(code, recordId), { method: 'DELETE' });
 
   return (await response.json()) as InquiryDetail;
 }
