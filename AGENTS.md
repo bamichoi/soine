@@ -9,7 +9,7 @@ pnpm 워크스페이스 모노레포. 초이돌상(choidolsang) 서비스와 끼
 | 도메인                  | 앱                      | 용도                                             |
 | ----------------------- | ----------------------- | ------------------------------------------------ |
 | `choidolsang.com`       | `apps/choidolsang-web`  | 초이돌상 고객용 서비스                           |
-| `admin.choidolsang.com` | `apps/backoffice`       | 로그인 후 계정 소속에 따라 `/choidolsang` 또는 `/kkiru` 백오피스로 분기 |
+| `admin.choidolsang.com` | `apps/backoffice`       | 로그인 화면에서 서비스 탭을 골라 `/choidolsang` 또는 `/kkiru` 백오피스로 로그인 |
 | `api.choidolsang.com`   | `apps/backend`          | 공통 REST API                                    |
 
 ## 구조
@@ -26,11 +26,29 @@ docs/adr/              # 아키텍처 의사결정 기록
 ## 핵심 규칙
 
 - 프론트/백엔드는 REST API(OpenAPI 계약)로만 통신. 앱 간 직접 import 금지.
+- 초이돌상과 끼루는 DB에서 PostgreSQL 스키마(`choidolsang`, `kkiru`)로 논리적으로 분리한다.
+  - 각 서비스의 테이블은 자기 스키마에 둔다 (Prisma `@@schema`).
+  - 두 스키마의 테이블끼리 관계(외래키)를 맺지 않는다.
+  - 관리자 계정과 세션도 서비스마다 따로 있다. 한 계정으로 두 서비스에 로그인하지 않는다.
 - 백오피스의 서비스 분기(`/choidolsang`, `/kkiru`) 접근 권한은 반드시 백엔드에서 강제한다.
   프론트의 경로 가드는 UX용일 뿐 보안 경계가 아니다.
 - 코드 포맷/린트: Biome (single quotes, 2-space indent, 100자, trailing commas)
 - shared 패키지: 2곳 이상 중복 확인 후에만 승격. 비즈니스 로직 금지.
 - 보안/인증/결제/데이터 삭제 로직은 AI 제안만 참고하고 사람이 확정.
+
+## 에셋 관리
+
+| 종류   | 위치                          | 규칙                                                         |
+| ------ | ----------------------------- | ------------------------------------------------------------ |
+| 아이콘 | `apps/<앱>/public/icons/*.svg` | kebab-case 파일명, `viewBox="0 0 24 24"`, 단색 선(stroke) 아이콘 |
+| 이미지 | `apps/<앱>/public/images/`    | 화면에서 쓰는 배포용 이미지                                  |
+
+- 아이콘·이미지 SVG를 컴포넌트 코드에 직접 넣지 않는다. 반드시 파일로 추가한다.
+- 아이콘은 `<Icon name="..." />`(`src/components/icon.tsx`)로 쓴다. 파일을 CSS 마스크로 써서
+  글자색을 따라가므로, 색은 `text-*` 클래스로 바꾼다. 새 아이콘은 파일을 추가하고
+  `ICON_NAMES`에 이름을 등록한다.
+- 아이콘만 있는 버튼에는 `aria-label`을 단다.
+- 에셋을 교체하면 모든 사용처를 새 파일로 바꾸고, 쓰지 않는 이전 파일은 지운다.
 
 ## 로컬 포트
 

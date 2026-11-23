@@ -4,8 +4,68 @@ generator client {
   moduleFormat = "cjs"
 }
 
+// 서비스는 PostgreSQL 스키마로 논리적으로 분리한다 (ADR-0003).
+// 초이돌상 테이블은 choidolsang 스키마, 끼루 테이블은 kkiru 스키마에 둔다.
+// 두 스키마의 테이블은 서로 관계를 맺지 않는다.
 datasource db {
   provider = "postgresql"
+  schemas  = ["choidolsang", "kkiru"]
 }
 
-// 모델은 계정/서비스 소속 설계 ADR이 확정된 뒤 추가한다.
+// ─────────────────────────────── choidolsang ───────────────────────────────
+
+/// 초이돌상 백오피스 관리자 계정.
+model ChoidolsangAdmin {
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String    @unique @db.VarChar(254)
+  name                String    @db.VarChar(100)
+  passwordHash        String    @db.VarChar(255)
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime? @db.Timestamptz(3)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@map("admins")
+  @@schema("choidolsang")
+}
+
+/// connect-pg-simple이 쓰는 초이돌상 관리자 세션 테이블.
+model ChoidolsangAdminSession {
+  sid    String   @id @db.VarChar(255)
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "admin_sessions_expire_idx")
+  @@map("admin_sessions")
+  @@schema("choidolsang")
+}
+
+// ────────────────────────────────── kkiru ──────────────────────────────────
+
+/// 끼루 백오피스 관리자 계정.
+model KkiruAdmin {
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String    @unique @db.VarChar(254)
+  name                String    @db.VarChar(100)
+  passwordHash        String    @db.VarChar(255)
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime? @db.Timestamptz(3)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@map("admins")
+  @@schema("kkiru")
+}
+
+/// connect-pg-simple이 쓰는 끼루 관리자 세션 테이블.
+model KkiruAdminSession {
+  sid    String   @id @db.VarChar(255)
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "admin_sessions_expire_idx")
+  @@map("admin_sessions")
+  @@schema("kkiru")
+}
