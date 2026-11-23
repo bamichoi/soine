@@ -15,8 +15,7 @@ packages/
 docs/
   adr/               # 의사결정 기록(ADR)
   templates/         # 문서 템플릿
-.github/
-  workflows/         # CI
+.github/             # PR/Issue 템플릿
 ```
 
 ## 기술 스택
@@ -48,6 +47,14 @@ pnpm dev:backend
 
 ```bash
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
+```
+
+## 브랜치 흐름
+
+```txt
+작업 브랜치 (feat/*, fix/*, chore/*, docs/*)
+  → dev   (개발 통합, PR로 머지)
+  → main  (운영, dev → main PR로만 반영)
 ```
 
 ## 문서

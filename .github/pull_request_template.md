@@ -12,7 +12,7 @@ Closes #
 
 ## 테스트
 
-- [ ] CI 통과 (lint, format, typecheck, test, build)
+- [ ] 로컬 검증 통과 (lint, format, typecheck, test, build)
 - [ ] 수동 확인 완료 (해당 시 시나리오 기재)
 
 ## 체크리스트
