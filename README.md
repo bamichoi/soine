@@ -50,6 +50,14 @@ pnpm dev:backend
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 ```
 
+## 브랜치 흐름
+
+```txt
+작업 브랜치 (feat/*, fix/*, chore/*, docs/*)
+  → dev   (개발 통합, PR로 머지)
+  → main  (운영, dev → main PR로만 반영)
+```
+
 ## 문서
 
 1. 팀 규칙: `AGENTS.md`
