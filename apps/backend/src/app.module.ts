@@ -18,6 +18,7 @@ import {
 import { AdminSessionModule } from './admin-session/admin-session.module';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { AdminSessionStoreService } from './admin-session/admin-session-store.service';
+import { ChoidolsangConceptsModule } from './choidolsang/concepts/concepts.module';
 import { ChoidolsangInquiriesModule } from './choidolsang/inquiries/inquiries.module';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     AdminSessionModule,
     AdminAuthModule,
+    ChoidolsangConceptsModule,
     ChoidolsangInquiriesModule,
   ],
   controllers: [HealthController],
