@@ -1,11 +1,25 @@
 // 백오피스 관리자 인증 API 클라이언트.
 // 요청은 next.config.ts의 rewrite로 백엔드 `/admin/*`에 전달된다.
-// 백엔드 로그인 API는 아직 없다. 계약은 인증 ADR에서 확정한다.
+// 계정과 세션은 서비스별로 분리되어 있다. 계약: docs/adr/ADR-0003-서비스별-관리자-계정과-세션.md
 
-export type AdminService = 'choidolsang' | 'kkiru';
+export const ADMIN_SERVICES = ['choidolsang', 'kkiru'] as const;
 
-export type AdminLoginResponse = {
-  services: AdminService[];
+export type AdminService = (typeof ADMIN_SERVICES)[number];
+
+export const ADMIN_SERVICE_LABELS: Record<AdminService, string> = {
+  choidolsang: '초이돌상',
+  kkiru: '끼루',
+};
+
+export function isAdminService(value: unknown): value is AdminService {
+  return typeof value === 'string' && (ADMIN_SERVICES as readonly string[]).includes(value);
+}
+
+export type AdminProfile = {
+  id: string;
+  email: string;
+  name: string;
+  service: AdminService;
 };
 
 export class AdminApiError extends Error {
@@ -18,26 +32,36 @@ export class AdminApiError extends Error {
   }
 }
 
-export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
-  const response = await fetch('/api/admin/auth/login', {
-    body: JSON.stringify({ email, password }),
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-  });
+async function requestAdminApi(path: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(`/api/admin/${path}`, { credentials: 'include', ...init });
 
   if (!response.ok) {
     throw new AdminApiError(response.status, response.statusText);
   }
 
-  return (await response.json()) as AdminLoginResponse;
+  return response;
 }
 
-// 로그인 후 이동할 경로. 소속 서비스가 둘 이상이면 서비스 선택 화면으로 보낸다.
-export function getPostLoginPath(services: AdminService[]): string {
-  if (services.length === 1) {
-    return `/${services[0]}`;
-  }
+export async function loginAdmin(
+  service: AdminService,
+  email: string,
+  password: string,
+): Promise<AdminProfile> {
+  const response = await requestAdminApi(`${service}/auth/login`, {
+    body: JSON.stringify({ email, password }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  });
 
-  return '/select-service';
+  return (await response.json()) as AdminProfile;
+}
+
+export async function getCurrentAdmin(service: AdminService): Promise<AdminProfile> {
+  const response = await requestAdminApi(`${service}/auth/me`);
+
+  return (await response.json()) as AdminProfile;
+}
+
+export async function logoutAdmin(service: AdminService): Promise<void> {
+  await requestAdminApi(`${service}/auth/logout`, { method: 'POST' });
 }
