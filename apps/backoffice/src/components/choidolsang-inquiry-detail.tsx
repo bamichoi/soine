@@ -40,6 +40,30 @@ function InfoItem({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// 삭제되지 않은 컨셉은 돌상 컨셉 상세로 이동할 수 있다.
+function DesiredConcept({ concept }: { concept: InquiryDetail['desiredConcept'] }) {
+  if (!concept) {
+    return EMPTY_VALUE;
+  }
+
+  if (concept.isDeleted) {
+    return (
+      <>
+        {concept.name} <span className="text-[var(--muted)]">(삭제됨)</span>
+      </>
+    );
+  }
+
+  return (
+    <Link
+      className="text-[var(--brand)] underline-offset-2 hover:underline"
+      href={`/choidolsang/concepts/${concept.id}`}
+    >
+      {concept.name}
+    </Link>
+  );
+}
+
 function InquiryBody({ inquiry, onChange }: InquiryActionsProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -61,7 +85,9 @@ function InquiryBody({ inquiry, onChange }: InquiryActionsProps) {
             : EMPTY_VALUE}
         </InfoItem>
         <InfoItem label="장소">{inquiry.location ?? EMPTY_VALUE}</InfoItem>
-        <InfoItem label="희망 돌상 컨셉">{inquiry.desiredConcept ?? EMPTY_VALUE}</InfoItem>
+        <InfoItem label="희망 돌상 컨셉">
+          <DesiredConcept concept={inquiry.desiredConcept} />
+        </InfoItem>
       </dl>
 
       {inquiry.status === 'rejected' && inquiry.rejectionReason ? (

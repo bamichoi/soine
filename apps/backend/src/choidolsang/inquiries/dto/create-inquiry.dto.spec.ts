@@ -12,7 +12,7 @@ describe('CreateInquiryDto', () => {
   it('accepts required fields only and trims empty optional fields to null', async () => {
     const { dto, properties } = await validateInput({
       content: '  가격 문의드립니다.  ',
-      desiredConcept: '   ',
+      desiredConceptId: '   ',
       inquiredOn: '2026-11-23',
       location: '',
     });
@@ -20,7 +20,7 @@ describe('CreateInquiryDto', () => {
     expect(properties).toEqual([]);
     expect(dto.content).toBe('가격 문의드립니다.');
     expect(dto.location).toBeNull();
-    expect(dto.desiredConcept).toBeNull();
+    expect(dto.desiredConceptId).toBeNull();
   });
 
   it('requires the inquiry date and content', async () => {
@@ -69,6 +69,24 @@ describe('CreateInquiryDto', () => {
     });
 
     expect(properties).toContain('status');
+  });
+});
+
+describe('CreateInquiryDto desired concept', () => {
+  it('accepts a concept ID only in UUID form', async () => {
+    const valid = await validateInput({
+      content: '문의',
+      desiredConceptId: '11111111-1111-4111-8111-111111111111',
+      inquiredOn: '2026-11-23',
+    });
+    const invalid = await validateInput({
+      content: '문의',
+      desiredConceptId: '한복 클래식',
+      inquiredOn: '2026-11-23',
+    });
+
+    expect(valid.properties).toEqual([]);
+    expect(invalid.properties).toContain('desiredConceptId');
   });
 });
 

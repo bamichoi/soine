@@ -295,8 +295,11 @@ export function ChoidolsangInquiryTable() {
                     </td>
                     <td className="px-4 py-3">
                       {inquiry.desiredConcept ? (
-                        <p className="truncate" title={inquiry.desiredConcept}>
-                          {inquiry.desiredConcept}
+                        <p className="truncate" title={inquiry.desiredConcept.name}>
+                          {inquiry.desiredConcept.name}
+                          {inquiry.desiredConcept.isDeleted ? (
+                            <span className="text-[var(--muted)]"> (삭제됨)</span>
+                          ) : null}
                         </p>
                       ) : (
                         EMPTY_VALUE

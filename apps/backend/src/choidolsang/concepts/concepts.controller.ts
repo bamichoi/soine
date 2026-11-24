@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AdminSessionGuard, RequireAdminService } from '../../admin-auth/admin-session.guard';
-import type { Concept, ConceptListResponse } from './concepts.service';
+import type { Concept, ConceptListResponse, ConceptOption } from './concepts.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { ChoidolsangConceptsService } from './concepts.service';
 // biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
@@ -33,6 +33,12 @@ export class ChoidolsangConceptsController {
   @Post()
   create(@Body() body: ConceptDto): Promise<Concept> {
     return this.conceptsService.create(body);
+  }
+
+  // ':id'보다 먼저 두어야 options가 ID로 읽히지 않는다.
+  @Get('options')
+  listOptions(): Promise<ConceptOption[]> {
+    return this.conceptsService.listOptions();
   }
 
   @Get(':id')

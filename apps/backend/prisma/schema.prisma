@@ -63,8 +63,9 @@ model ChoidolsangInquiry {
   desiredReservationAt DateTime?                  @db.Timestamptz(3)
   /// 장소
   location             String?                    @db.VarChar(200)
-  /// 희망 돌상 컨셉. 돌상 컨셉 테이블이 생기면 참조로 바꾼다.
-  desiredConcept       String?                    @db.VarChar(200)
+  /// 희망 돌상 컨셉 (돌상 컨셉 참조). 숨김 삭제된 컨셉도 참조는 유지한다.
+  desiredConceptId     String?                    @db.Uuid
+  desiredConcept       ChoidolsangConcept?        @relation(fields: [desiredConceptId], references: [id], onDelete: Restrict)
   status               ChoidolsangInquiryStatus   @default(pending)
   /// 거절 사유. 거절(rejected) 상태일 때만 값이 있다.
   rejectionReason      String?                    @db.Text
@@ -76,6 +77,7 @@ model ChoidolsangInquiry {
   records              ChoidolsangInquiryRecord[]
 
   @@index([inquiredOn(sort: Desc), createdAt(sort: Desc)], map: "inquiries_inquired_on_idx")
+  @@index([desiredConceptId], map: "inquiries_desired_concept_id_idx")
   @@map("inquiries")
   @@schema("choidolsang")
 }
@@ -138,6 +140,9 @@ model ChoidolsangConcept {
   deletedAt  DateTime? @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  /// 이 컨셉을 희망한 문의
+  inquiries ChoidolsangInquiry[]
 
   @@index([createdAt(sort: Desc)], map: "concepts_created_at_idx")
   @@map("concepts")

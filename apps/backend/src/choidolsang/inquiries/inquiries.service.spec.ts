@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -18,11 +18,24 @@ const FIRST_RECORD = {
   recordedOn: new Date('2026-11-20T00:00:00.000Z'),
 };
 
+const CONCEPT = {
+  components: [],
+  createdAt: new Date('2026-11-01T00:00:00.000Z'),
+  deletedAt: null,
+  id: '11111111-1111-4111-8111-111111111111',
+  name: '한복 클래식',
+  price: 250000,
+  updatedAt: new Date('2026-11-01T00:00:00.000Z'),
+};
+
+const INCLUDE = { desiredConcept: true, records: { orderBy: RECORD_ORDER } };
+
 const INQUIRY = {
   code: '7K3FQ9AM',
   createdAt: new Date('2026-11-20T01:00:00.000Z'),
   deletedAt: null,
-  desiredConcept: '한복 클래식',
+  desiredConcept: CONCEPT,
+  desiredConceptId: CONCEPT.id,
   desiredReservationAt: new Date('2026-12-05T02:00:00.000Z'),
   id: 'inquiry-1',
   inquiredOn: new Date('2026-11-20T00:00:00.000Z'),
@@ -49,8 +62,12 @@ function createPrismaMock() {
     findFirst: jest.fn((): Promise<unknown> => Promise.resolve(FIRST_RECORD)),
     updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
   };
+  const concept = {
+    findFirst: jest.fn((): Promise<unknown> => Promise.resolve({ id: CONCEPT.id })),
+  };
   const tx = {
     $executeRaw: jest.fn(() => Promise.resolve(1)),
+    choidolsangConcept: concept,
     choidolsangInquiry: inquiry,
     choidolsangInquiryRecord: record,
   };
@@ -62,6 +79,7 @@ function createPrismaMock() {
   };
 
   return {
+    concept,
     inquiry,
     record,
     service: new ChoidolsangInquiriesService(prisma as unknown as PrismaService),
@@ -98,7 +116,7 @@ describe('buildInquiryWhere', () => {
       OR: [
         { records: { some: { content: { contains: '대기', mode: 'insensitive' } } } },
         { location: { contains: '대기', mode: 'insensitive' } },
-        { desiredConcept: { contains: '대기', mode: 'insensitive' } },
+        { desiredConcept: { is: { name: { contains: '대기', mode: 'insensitive' } } } },
         { status: { in: ['pending'] } },
       ],
     });
@@ -132,7 +150,7 @@ describe('ChoidolsangInquiriesService', () => {
     const result = await mock.service.list({ page: 2 });
 
     expect(mock.inquiry.findMany).toHaveBeenCalledWith({
-      include: { records: { orderBy: RECORD_ORDER, take: 1 } },
+      include: { desiredConcept: true, records: { orderBy: RECORD_ORDER, take: 1 } },
       orderBy: [{ inquiredOn: 'desc' }, { createdAt: 'desc' }],
       skip: INQUIRY_PAGE_SIZE,
       take: INQUIRY_PAGE_SIZE,
@@ -147,7 +165,7 @@ describe('ChoidolsangInquiriesService', () => {
     expect(result.items[0]).toEqual({
       code: '7K3FQ9AM',
       content: FIRST_RECORD.content,
-      desiredConcept: '한복 클래식',
+      desiredConcept: { id: CONCEPT.id, isDeleted: false, name: '한복 클래식' },
       desiredReservationAt: '2026-12-05T02:00:00.000Z',
       id: 'inquiry-1',
       inquiredOn: '2026-11-20',
@@ -169,7 +187,7 @@ describe('ChoidolsangInquiriesService', () => {
       ],
     });
     expect(mock.inquiry.findFirst).toHaveBeenCalledWith({
-      include: { records: { orderBy: RECORD_ORDER } },
+      include: INCLUDE,
       where: { code: '7K3FQ9AM', deletedAt: null },
     });
   });
@@ -191,7 +209,7 @@ describe('ChoidolsangInquiriesService', () => {
     expect(mock.inquiry.create).toHaveBeenCalledWith({
       data: {
         code: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{8}$/),
-        desiredConcept: null,
+        desiredConceptId: null,
         desiredReservationAt: new Date('2026-12-05T02:00:00.000Z'),
         inquiredOn: new Date('2026-11-23T00:00:00.000Z'),
         location: null,
@@ -201,7 +219,7 @@ describe('ChoidolsangInquiriesService', () => {
         rejectionReason: null,
         status: 'pending',
       },
-      include: { records: { orderBy: RECORD_ORDER } },
+      include: INCLUDE,
     });
   });
 
@@ -292,7 +310,7 @@ describe('ChoidolsangInquiriesService status changes', () => {
 });
 
 describe('ChoidolsangInquiriesService edit and delete', () => {
-  const FIELDS = { desiredConcept: null, location: '서울 마포구' };
+  const FIELDS = { desiredConceptId: CONCEPT.id, location: '서울 마포구' };
   let mock: ReturnType<typeof createPrismaMock>;
 
   beforeEach(() => {
@@ -303,7 +321,7 @@ describe('ChoidolsangInquiriesService edit and delete', () => {
     await mock.service.update('7k3fq9am', { ...FIELDS, rejectionReason: '무시될 사유' });
 
     expect(mock.inquiry.updateMany).toHaveBeenCalledWith({
-      data: { desiredConcept: null, desiredReservationAt: null, location: '서울 마포구' },
+      data: { desiredConceptId: CONCEPT.id, desiredReservationAt: null, location: '서울 마포구' },
       where: { code: '7K3FQ9AM', deletedAt: null, status: 'pending' },
     });
   });
@@ -423,5 +441,67 @@ describe('ChoidolsangInquiriesService records', () => {
       NotFoundException,
     );
     expect(mock.record.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChoidolsangInquiriesService desired concept', () => {
+  const OTHER_CONCEPT_ID = '22222222-2222-4222-8222-222222222222';
+  let mock: ReturnType<typeof createPrismaMock>;
+
+  beforeEach(() => {
+    mock = createPrismaMock();
+  });
+
+  it('sorts by the concept name', () => {
+    expect(buildInquiryOrderBy('desiredConcept', 'asc')).toEqual([
+      { desiredConcept: { name: 'asc' } },
+      { createdAt: 'desc' },
+    ]);
+  });
+
+  it('marks a soft-deleted concept in the detail', async () => {
+    mock.inquiry.findFirst.mockResolvedValue({
+      ...INQUIRY,
+      desiredConcept: { ...CONCEPT, deletedAt: new Date('2026-11-23T00:00:00.000Z') },
+    });
+
+    await expect(mock.service.findByCode('7K3FQ9AM')).resolves.toMatchObject({
+      desiredConcept: { id: CONCEPT.id, isDeleted: true, name: '한복 클래식' },
+    });
+  });
+
+  it('refuses an unknown or deleted concept when creating', async () => {
+    mock.concept.findFirst.mockResolvedValue(null);
+
+    await expect(
+      mock.service.create({
+        content: '문의',
+        desiredConceptId: OTHER_CONCEPT_ID,
+        inquiredOn: '2026-11-23',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mock.concept.findFirst).toHaveBeenCalledWith({
+      select: { id: true },
+      where: { deletedAt: null, id: OTHER_CONCEPT_ID },
+    });
+    expect(mock.inquiry.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current concept on update even if it was deleted since', async () => {
+    mock.concept.findFirst.mockResolvedValue(null);
+
+    await mock.service.update('7K3FQ9AM', { desiredConceptId: CONCEPT.id });
+
+    expect(mock.concept.findFirst).not.toHaveBeenCalled();
+    expect(mock.inquiry.updateMany).toHaveBeenCalled();
+  });
+
+  it('checks a newly chosen concept on update', async () => {
+    mock.concept.findFirst.mockResolvedValue(null);
+
+    await expect(
+      mock.service.update('7K3FQ9AM', { desiredConceptId: OTHER_CONCEPT_ID }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mock.inquiry.updateMany).not.toHaveBeenCalled();
   });
 });
