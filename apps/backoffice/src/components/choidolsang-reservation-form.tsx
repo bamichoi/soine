@@ -20,16 +20,20 @@ import {
   BABY_GENDER_LABELS,
   BABY_GENDERS,
   type BabyGender,
-  type CreateReservationInput,
   createReservation,
   DEFAULT_DEPOSIT_AMOUNT,
   EXTRA_COMPONENT_MAX_LENGTH,
   EXTRA_COMPONENTS_MAX_COUNT,
+  getReservation,
   RESERVATION_AMOUNT_MAX,
   RESERVATION_REQUESTS_MAX_LENGTH,
+  type Reservation,
+  type ReservationFieldsInput,
+  updateReservation,
 } from '@/lib/choidolsang-reservations-api';
 import { formatWon, parseAmountText, toAmountText } from '@/lib/money';
-import { type StringListItem, toStringListValues } from '@/lib/string-list';
+import { formatPhone, isValidPhone } from '@/lib/phone';
+import { type StringListItem, toStringListItems, toStringListValues } from '@/lib/string-list';
 
 const INQUIRIES_PATH = '/choidolsang/inquiries';
 const RESERVATIONS_PATH = '/choidolsang/reservations';
@@ -39,6 +43,7 @@ const CONTROL_CLASS_NAME =
 
 type FormValues = {
   customerName: string;
+  customerPhone: string;
   eventDate: string;
   eventTime: string;
   eventLocation: string;
@@ -54,6 +59,29 @@ type FormValues = {
   confirmedOn: string;
 };
 
+// 수정할 때는 저장된 예약 값으로 폼을 채운다.
+function getValuesFromReservation(reservation: Reservation): FormValues {
+  const event = toSeoulDateAndTime(reservation.eventAt);
+
+  return {
+    babyGender: reservation.babyGender,
+    babyName: reservation.babyName,
+    conceptId: reservation.concept.id,
+    confirmedOn: reservation.confirmedOn,
+    customerName: reservation.customerName,
+    customerPhone: formatPhone(reservation.customerPhone),
+    depositText: toAmountText(String(reservation.depositAmount)),
+    eventDate: event.date,
+    eventLocation: reservation.eventLocation,
+    eventTime: event.time,
+    extraComponents: toStringListItems(reservation.extraComponents),
+    guestCountText: String(reservation.guestCount),
+    hasSnap: reservation.hasSnap,
+    requests: reservation.requests ?? '',
+    totalText: toAmountText(String(reservation.totalAmount)),
+  };
+}
+
 // 문의에 적힌 값으로 폼 기본값을 채운다.
 function getInitialValues(inquiry: InquiryDetail): FormValues {
   const event = inquiry.desiredReservationAt
@@ -68,6 +96,7 @@ function getInitialValues(inquiry: InquiryDetail): FormValues {
     conceptId: concept && !concept.isDeleted ? concept.id : '',
     confirmedOn: getSeoulToday(),
     customerName: '',
+    customerPhone: '',
     depositText: toAmountText(String(DEFAULT_DEPOSIT_AMOUNT)),
     eventDate: event.date,
     eventLocation: inquiry.location ?? '',
@@ -83,6 +112,10 @@ function getInitialValues(inquiry: InquiryDetail): FormValues {
 function validateRequired(values: FormValues): string | null {
   if (!values.customerName.trim()) {
     return '예약자 성함을 입력해 주세요.';
+  }
+
+  if (!isValidPhone(values.customerPhone)) {
+    return '예약자 연락처를 바르게 입력해 주세요. (예: 010-1234-5678)';
   }
 
   if (!(values.eventDate && values.eventTime)) {
@@ -109,7 +142,7 @@ function validateRequired(values: FormValues): string | null {
 }
 
 /** 입력값을 검사해 보낼 값을 만든다. 문제가 있으면 안내 문구를 돌려준다. */
-function buildInput(inquiryCode: string, values: FormValues): CreateReservationInput | string {
+function buildInput(values: FormValues): ReservationFieldsInput | string {
   const requiredError = validateRequired(values);
 
   if (requiredError) {
@@ -137,6 +170,7 @@ function buildInput(inquiryCode: string, values: FormValues): CreateReservationI
     conceptId: values.conceptId,
     confirmedOn: values.confirmedOn,
     customerName: values.customerName.trim(),
+    customerPhone: values.customerPhone.replace(/\D/g, ''),
     depositAmount,
     // 행사 시간은 한국 시간으로 보낸다.
     eventAt: `${values.eventDate}T${values.eventTime}:00+09:00`,
@@ -144,15 +178,16 @@ function buildInput(inquiryCode: string, values: FormValues): CreateReservationI
     extraComponents: toStringListValues(values.extraComponents),
     guestCount: Number(values.guestCountText),
     hasSnap: values.hasSnap,
-    inquiryCode,
     requests: values.requests.trim() || null,
     totalAmount,
   };
 }
 
-function getSubmitErrorMessage(error: unknown): string {
+function getSubmitErrorMessage(error: unknown, isEdit: boolean): string {
   if (error instanceof AdminApiError && error.status === 409) {
-    return '이미 예약이 만들어졌거나 예약할 수 없는 문의입니다. 문의 상세를 확인해 주세요.';
+    return isEdit
+      ? '완료되었거나 취소된 예약은 수정할 수 없습니다. 예약 상세를 확인해 주세요.'
+      : '이미 예약이 만들어졌거나 예약할 수 없는 문의입니다. 문의 상세를 확인해 주세요.';
   }
 
   if (error instanceof AdminApiError && error.status === 404) {
@@ -170,14 +205,25 @@ function SectionTitle({ children }: { children: string }) {
   return <h3 className="text-xs font-medium text-[var(--muted)]">{children}</h3>;
 }
 
-function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
+/** 문의에서 새 예약을 만들거나, 예약중인 예약을 고친다. */
+type FormTarget =
+  | { kind: 'create'; inquiry: InquiryDetail }
+  | { kind: 'edit'; reservation: Reservation };
+
+function ReservationForm({ target }: { target: FormTarget }) {
   const router = useRouter();
   const idPrefix = useId();
-  const [values, setValues] = useState(() => getInitialValues(inquiry));
+  const isEdit = target.kind === 'edit';
+  const inquiryCode = isEdit ? target.reservation.inquiryCode : target.inquiry.code;
+  const inquirySummary = isEdit ? null : getFirstLine(target.inquiry.content);
+  const [values, setValues] = useState(() =>
+    isEdit ? getValuesFromReservation(target.reservation) : getInitialValues(target.inquiry),
+  );
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const id = (field: string) => `${idPrefix}-${field}`;
-  const inquiryHref = `${INQUIRIES_PATH}/${inquiry.code}`;
+  const inquiryHref = `${INQUIRIES_PATH}/${inquiryCode}`;
+  const cancelHref = isEdit ? `${RESERVATIONS_PATH}/${target.reservation.code}` : inquiryHref;
   const totalAmount = parseAmountText(values.totalText);
   const depositAmount = parseAmountText(values.depositText) ?? 0;
 
@@ -200,7 +246,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = buildInput(inquiry.code, values);
+    const result = buildInput(values);
 
     if (typeof result === 'string') {
       setErrorMessage(result);
@@ -211,17 +257,19 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
     setIsSubmitting(true);
 
     try {
-      const reservation = await createReservation(result);
+      const reservation = isEdit
+        ? await updateReservation(target.reservation.code, result)
+        : await createReservation({ ...result, inquiryCode });
       router.push(`${RESERVATIONS_PATH}/${reservation.code}`);
     } catch (error) {
-      setErrorMessage(getSubmitErrorMessage(error));
+      setErrorMessage(getSubmitErrorMessage(error, isEdit));
       setIsSubmitting(false);
     }
   }
 
   return (
     <form
-      aria-label="예약 확정"
+      aria-label={isEdit ? '예약 수정' : '예약 확정'}
       className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
       onSubmit={handleSubmit}
     >
@@ -231,8 +279,8 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
       >
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 text-[var(--muted)]">문의</span>
-          <span className="shrink-0 font-mono tracking-wide">{inquiry.code}</span>
-          <span className="truncate">{getFirstLine(inquiry.content)}</span>
+          <span className="shrink-0 font-mono tracking-wide">{inquiryCode}</span>
+          {inquirySummary ? <span className="truncate">{inquirySummary}</span> : null}
         </span>
         <Icon className="size-4 shrink-0 text-[var(--muted)]" name="chevron-right" />
       </Link>
@@ -250,6 +298,19 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
               onChange={(event) => update('customerName', event.target.value)}
               required
               value={values.customerName}
+            />
+          </FormField>
+          <FormField htmlFor={id('customer-phone')} label="예약자 연락처" required>
+            <input
+              autoComplete="off"
+              className={`${CONTROL_CLASS_NAME} h-10 tabular-nums sm:w-64`}
+              id={id('customer-phone')}
+              inputMode="tel"
+              onChange={(event) => update('customerPhone', formatPhone(event.target.value))}
+              placeholder="010-1234-5678"
+              required
+              type="tel"
+              value={values.customerPhone}
             />
           </FormField>
           <FormField
@@ -337,7 +398,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
           <SectionTitle>상품</SectionTitle>
           <FormField htmlFor={id('concept')} label="돌상 컨셉" required>
             <ConceptSelect
-              current={null}
+              current={isEdit ? target.reservation.concept : null}
               emptyLabel="돌상 컨셉을 골라 주세요"
               id={id('concept')}
               onChange={(conceptId, option) => {
@@ -437,7 +498,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
         <div className="flex justify-end gap-2">
           <Link
             className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={inquiryHref}
+            href={cancelHref}
           >
             취소
           </Link>
@@ -446,7 +507,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
             disabled={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? '저장 중...' : '예약 확정'}
+            {isSubmitting ? '저장 중...' : isEdit ? '저장' : '예약 확정'}
           </button>
         </div>
       </footer>
@@ -587,5 +648,74 @@ export function ChoidolsangReservationCreate({ inquiryCode }: { inquiryCode: str
     );
   }
 
-  return <ReservationForm inquiry={inquiry} />;
+  return <ReservationForm target={{ inquiry, kind: 'create' }} />;
+}
+
+type EditLoadState =
+  | { kind: 'loading' }
+  | { kind: 'not-found' }
+  | { kind: 'error' }
+  | { kind: 'loaded'; reservation: Reservation };
+
+/** 예약을 불러와 수정 폼을 연다. 예약중이 아니면 수정할 수 없다고 안내한다. */
+export function ChoidolsangReservationEdit({ code }: { code: string }) {
+  const [state, setState] = useState<EditLoadState>({ kind: 'loading' });
+
+  useEffect(() => {
+    let isActive = true;
+
+    getReservation(code)
+      .then((reservation) => {
+        if (isActive) {
+          setState({ kind: 'loaded', reservation });
+        }
+      })
+      .catch((error: unknown) => {
+        if (isActive) {
+          setState(
+            error instanceof AdminApiError && error.status === 404
+              ? { kind: 'not-found' }
+              : { kind: 'error' },
+          );
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [code]);
+
+  if (state.kind === 'loading') {
+    return <p className="py-10 text-sm text-[var(--muted)]">예약을 불러오고 있습니다.</p>;
+  }
+
+  if (state.kind === 'not-found') {
+    return <p className="py-10 text-sm text-[var(--muted)]">해당 예약을 찾을 수 없습니다.</p>;
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <p className="py-10 text-sm text-[var(--error)]" role="alert">
+        예약을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+      </p>
+    );
+  }
+
+  const { reservation } = state;
+
+  if (reservation.status !== 'reserved') {
+    return (
+      <p className="py-10 text-sm">
+        완료되었거나 취소된 예약은 수정할 수 없습니다.{' '}
+        <Link
+          className="text-[var(--brand)] underline underline-offset-2"
+          href={`${RESERVATIONS_PATH}/${reservation.code}`}
+        >
+          예약 보기
+        </Link>
+      </p>
+    );
+  }
+
+  return <ReservationForm target={{ kind: 'edit', reservation }} />;
 }

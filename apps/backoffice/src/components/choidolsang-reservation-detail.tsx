@@ -14,6 +14,7 @@ import {
   type Reservation,
 } from '@/lib/choidolsang-reservations-api';
 import { formatWon } from '@/lib/money';
+import { formatPhone } from '@/lib/phone';
 
 const SECONDARY_BUTTON_CLASS_NAME =
   'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
@@ -58,15 +59,31 @@ function ReservationBody({ reservation }: { reservation: Reservation }) {
   return (
     <div className="flex flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-3">
-        <p className="flex items-baseline gap-2 text-sm">
-          <span className="text-[var(--muted)]">예약 번호</span>
-          <span className="font-mono tracking-wide">{reservation.code}</span>
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="flex items-baseline gap-2 text-sm">
+            <span className="text-[var(--muted)]">예약 번호</span>
+            <span className="font-mono tracking-wide">{reservation.code}</span>
+          </p>
+          <Link
+            className="flex h-7 items-center border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]"
+            href={`/choidolsang/inquiries/${reservation.inquiryCode}`}
+          >
+            문의 기록
+          </Link>
+        </div>
         <ReservationStatusBadge status={reservation.status} />
       </header>
 
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         <InfoItem label="예약자 성함">{reservation.customerName}</InfoItem>
+        <InfoItem label="예약자 연락처">
+          <a
+            className="text-[var(--brand)] tabular-nums underline-offset-2 hover:underline"
+            href={`tel:${reservation.customerPhone}`}
+          >
+            {formatPhone(reservation.customerPhone)}
+          </a>
+        </InfoItem>
         <InfoItem label="행사 날짜·시간">{formatSeoulDateTime(reservation.eventAt)}</InfoItem>
         <InfoItem label="행사 장소">{reservation.eventLocation}</InfoItem>
         <InfoItem label="참석 인원">{reservation.guestCount}명</InfoItem>
@@ -134,38 +151,41 @@ type ReservationActionsProps = {
   onChange: (reservation: Reservation) => void;
 };
 
-// 왼쪽: [문의 기록] / 오른쪽(예약중일 때만): [예약 취소] [업무 완료]
+// 예약중일 때만: 왼쪽 [수정] / 오른쪽 [예약 취소] [업무 완료]
 function ReservationActions({ reservation, onChange }: ReservationActionsProps) {
   const [dialog, setDialog] = useState<'cancel' | 'complete' | null>(null);
   const isReserved = reservation.status === 'reserved';
+
+  // 완료·취소환불된 예약은 기록으로 남기므로 버튼이 없다.
+  if (!isReserved) {
+    return null;
+  }
 
   return (
     <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
       <Link
         className={SECONDARY_BUTTON_CLASS_NAME}
-        href={`/choidolsang/inquiries/${reservation.inquiryCode}`}
+        href={`/choidolsang/reservations/${reservation.code}/edit`}
       >
-        문의 기록
+        수정
       </Link>
 
-      {isReserved ? (
-        <div className="flex gap-2">
-          <button
-            className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
-            onClick={() => setDialog('cancel')}
-            type="button"
-          >
-            예약 취소
-          </button>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)]"
-            onClick={() => setDialog('complete')}
-            type="button"
-          >
-            업무 완료
-          </button>
-        </div>
-      ) : null}
+      <div className="flex gap-2">
+        <button
+          className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
+          onClick={() => setDialog('cancel')}
+          type="button"
+        >
+          예약 취소
+        </button>
+        <button
+          className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)]"
+          onClick={() => setDialog('complete')}
+          type="button"
+        >
+          업무 완료
+        </button>
+      </div>
 
       <ConfirmDialog
         confirmLabel="예약 취소"
