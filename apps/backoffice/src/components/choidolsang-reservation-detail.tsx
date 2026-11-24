@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Icon } from '@/components/icon';
 import { ReservationStatusBadge } from '@/components/reservation-status-badge';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import { formatInquiryDate, formatSeoulDateTime } from '@/lib/choidolsang-inquiries-api';
@@ -77,12 +78,17 @@ function ReservationBody({ reservation }: { reservation: Reservation }) {
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         <InfoItem label="예약자 성함">{reservation.customerName}</InfoItem>
         <InfoItem label="예약자 연락처">
-          <a
-            className="text-[var(--brand)] tabular-nums underline-offset-2 hover:underline"
-            href={`tel:${reservation.customerPhone}`}
-          >
-            {formatPhone(reservation.customerPhone)}
-          </a>
+          <span className="flex flex-wrap items-center gap-3">
+            <span className="tabular-nums">{formatPhone(reservation.customerPhone)}</span>
+            {/* 모바일에서만 바로 전화를 걸 수 있게 한다. */}
+            <a
+              className="inline-flex h-8 items-center gap-1.5 border border-[var(--brand)] px-3 text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand-soft)] md:hidden"
+              href={`tel:${reservation.customerPhone}`}
+            >
+              <Icon className="size-3.5" name="phone" />
+              전화 걸기
+            </a>
+          </span>
         </InfoItem>
         <InfoItem label="행사 날짜·시간">{formatSeoulDateTime(reservation.eventAt)}</InfoItem>
         <InfoItem label="행사 장소">{reservation.eventLocation}</InfoItem>
