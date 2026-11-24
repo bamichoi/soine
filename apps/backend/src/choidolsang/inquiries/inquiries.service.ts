@@ -71,6 +71,8 @@ export type InquiryDetail = InquiryListItem & {
   records: InquiryRecord[];
   /** 거절 사유. 거절 상태일 때만 값이 있다. */
   rejectionReason: string | null;
+  /** 이 문의로 만든 예약의 예약 번호. 없으면 null */
+  reservationCode: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -167,6 +169,8 @@ const RECORD_ORDER = [
 type InquiryWithRecords = ChoidolsangInquiry & {
   records: ChoidolsangInquiryRecord[];
   desiredConcept: ChoidolsangConcept | null;
+  /** 상세에서만 싣는다. */
+  reservation?: { code: string } | null;
 };
 
 function toConceptRef(concept: ChoidolsangConcept | null): InquiryConceptRef | null {
@@ -213,6 +217,7 @@ function toDetail(inquiry: InquiryWithRecords): InquiryDetail {
     createdAt: inquiry.createdAt.toISOString(),
     records: inquiry.records.map(toRecord),
     rejectionReason: inquiry.rejectionReason,
+    reservationCode: inquiry.reservation?.code ?? null,
     updatedAt: inquiry.updatedAt.toISOString(),
   };
 }
@@ -221,6 +226,7 @@ function toDetail(inquiry: InquiryWithRecords): InquiryDetail {
 const INQUIRY_INCLUDE = {
   desiredConcept: true,
   records: { orderBy: RECORD_ORDER },
+  reservation: { select: { code: true } },
 } satisfies Prisma.ChoidolsangInquiryInclude;
 
 // 숨김 삭제한 문의는 어디서도 보이지 않는다.
@@ -400,7 +406,10 @@ export class ChoidolsangInquiriesService {
     });
   }
 
-  /** 문의를 숨김 삭제한다. 행은 남기고 deletedAt만 기록한다. */
+  /**
+   * 문의를 숨김 삭제한다. 행은 남기고 deletedAt만 기록한다.
+   * 예약으로 이어진 문의는 예약이 문의를 가리키므로 지울 수 없다(409).
+   */
   async remove(rawCode: string): Promise<void> {
     const code = normalizeInquiryCode(rawCode);
 
@@ -410,12 +419,20 @@ export class ChoidolsangInquiriesService {
 
     const { count } = await this.prisma.choidolsangInquiry.updateMany({
       data: { deletedAt: new Date() },
-      where: { code, ...NOT_DELETED },
+      where: { code, ...NOT_DELETED, reservation: { is: null } },
     });
 
-    if (count === 0) {
+    if (count > 0) {
+      return;
+    }
+
+    const inquiry = await this.findActive(code);
+
+    if (!inquiry) {
       throw inquiryNotFound();
     }
+
+    throw new ConflictException('Inquiry has a reservation');
   }
 
   /** 대기 중인 문의를 거절한다. 거절 사유는 필수. */

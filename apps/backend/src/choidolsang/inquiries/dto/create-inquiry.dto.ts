@@ -13,8 +13,9 @@ import {
 } from 'class-validator';
 import { REJECTION_REASON_MAX_LENGTH } from './reject-inquiry.dto';
 
-// 취소(cancelled)는 연결된 예약이 취소될 때만 바뀌므로 문의를 추가할 때는 고를 수 없다.
-export const INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+// 예약확정(confirmed)은 예약을 만들 때, 취소(cancelled)는 예약을 취소할 때만 바뀌므로
+// 문의를 추가할 때는 대기·거절만 고를 수 있다.
+export const INQUIRY_STATUSES = ['pending', 'rejected'] as const;
 export type InquiryStatusValue = (typeof INQUIRY_STATUSES)[number];
 
 export const INQUIRY_CONTENT_MAX_LENGTH = 5000;

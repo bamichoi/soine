@@ -113,27 +113,39 @@ type InquiryActionsProps = {
 const PRIMARY_BUTTON_CLASS_NAME =
   'h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-50';
 
-// 상태별 버튼 — 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정: [예약 정보] / 취소: 없음
-function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
-  const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [isReopening, setIsReopening] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  if (inquiry.status === 'cancelled') {
-    return null;
-  }
-
-  if (inquiry.status === 'confirmed') {
+// 예약확정·취소 문의는 이어진 예약으로 간다.
+function ReservationLink({ reservationCode }: { reservationCode: string | null }) {
+  if (!reservationCode) {
     return (
       <button
         className={PRIMARY_BUTTON_CLASS_NAME}
         disabled
-        title="예약 기능은 준비 중입니다."
+        title="이어진 예약이 없습니다."
         type="button"
       >
         예약 정보
       </button>
     );
+  }
+
+  return (
+    <Link
+      className={`${PRIMARY_BUTTON_CLASS_NAME} flex items-center`}
+      href={`/choidolsang/reservations/${reservationCode}`}
+    >
+      예약 정보
+    </Link>
+  );
+}
+
+// 상태별 버튼 — 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정·취소: [예약 정보]
+function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  if (inquiry.status === 'confirmed' || inquiry.status === 'cancelled') {
+    return <ReservationLink reservationCode={inquiry.reservationCode} />;
   }
 
   async function handleReopen() {
@@ -179,14 +191,12 @@ function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
             {isReopening ? '변경 중...' : '대기'}
           </button>
         )}
-        <button
-          className={PRIMARY_BUTTON_CLASS_NAME}
-          disabled
-          title="예약 폼은 준비 중입니다."
-          type="button"
+        <Link
+          className={`${PRIMARY_BUTTON_CLASS_NAME} flex items-center`}
+          href={`/choidolsang/reservations/new?inquiry=${inquiry.code}`}
         >
           예약 진행
-        </button>
+        </Link>
       </div>
 
       <InquiryRejectDialog
@@ -219,9 +229,12 @@ function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
         >
           수정
         </Link>
+        {/* 예약으로 이어진 문의는 예약이 가리키고 있어 지울 수 없다. */}
         <button
           className={SECONDARY_BUTTON_CLASS_NAME}
+          disabled={inquiry.reservationCode !== null}
           onClick={() => setIsDeleteOpen(true)}
+          title={inquiry.reservationCode ? '예약으로 이어진 문의는 삭제할 수 없습니다.' : undefined}
           type="button"
         >
           삭제

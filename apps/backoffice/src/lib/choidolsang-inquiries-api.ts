@@ -3,8 +3,8 @@ import { requestAdminApi } from '@/lib/admin-auth-api';
 export const INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled'] as const;
 export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
 
-// 취소는 연결된 예약이 취소될 때만 바뀌므로 문의를 추가할 때는 고를 수 없다.
-export const CREATABLE_INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+// 예약확정은 예약을 만들 때, 취소는 예약을 취소할 때만 바뀌므로 문의를 추가할 때는 대기·거절만 고른다.
+export const CREATABLE_INQUIRY_STATUSES = ['pending', 'rejected'] as const;
 
 export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
   cancelled: '취소',
@@ -53,6 +53,8 @@ export type InquiryDetail = Inquiry & {
   records: InquiryRecord[];
   /** 거절 사유. 거절 상태일 때만 값이 있다. */
   rejectionReason: string | null;
+  /** 이 문의로 만든 예약의 예약 번호. 없으면 null */
+  reservationCode: string | null;
   createdAt: string;
   updatedAt: string;
 };

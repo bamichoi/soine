@@ -75,6 +75,8 @@ model ChoidolsangInquiry {
   updatedAt            DateTime                   @updatedAt @db.Timestamptz(3)
   /// 문의 내용 로그. 첫 기록이 첫 문의다.
   records              ChoidolsangInquiryRecord[]
+  /// 이 문의로 만든 예약 (문의 하나에 예약 하나)
+  reservation          ChoidolsangReservation?
 
   @@index([inquiredOn(sort: Desc), createdAt(sort: Desc)], map: "inquiries_inquired_on_idx")
   @@index([desiredConceptId], map: "inquiries_desired_concept_id_idx")
@@ -142,9 +144,79 @@ model ChoidolsangConcept {
   updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 
   /// 이 컨셉을 희망한 문의
-  inquiries ChoidolsangInquiry[]
+  inquiries    ChoidolsangInquiry[]
+  /// 이 컨셉으로 잡은 예약
+  reservations ChoidolsangReservation[]
 
   @@index([createdAt(sort: Desc)], map: "concepts_created_at_idx")
   @@map("concepts")
+  @@schema("choidolsang")
+}
+
+/// 초이돌상 예약 상태
+enum ChoidolsangReservationStatus {
+  reserved // 예약중
+  cancelled // 취소환불
+  completed // 완료
+
+  @@map("reservation_status")
+  @@schema("choidolsang")
+}
+
+/// 아기 성별
+enum ChoidolsangBabyGender {
+  boy // 남아
+  girl // 여아
+
+  @@map("baby_gender")
+  @@schema("choidolsang")
+}
+
+/// 초이돌상 예약. 항상 문의 하나에서 만들어진다(문의 하나에 예약 하나).
+model ChoidolsangReservation {
+  id              String                       @id @default(uuid()) @db.Uuid
+  /// 화면·주소에 쓰는 예약 번호. 8자리 무작위 코드
+  code            String                       @unique @db.VarChar(16)
+  /// 예약을 만든 문의
+  inquiryId       String                       @unique @db.Uuid
+  inquiry         ChoidolsangInquiry           @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  /// 예약자 성함
+  customerName    String                       @db.VarChar(100)
+  /// 행사 날짜·시간
+  eventAt         DateTime                     @db.Timestamptz(3)
+  /// 행사 장소
+  eventLocation   String                       @db.VarChar(200)
+  /// 아기 이름
+  babyName        String                       @db.VarChar(100)
+  /// 아기 성별
+  babyGender      ChoidolsangBabyGender
+  /// 돌상 컨셉
+  conceptId       String                       @db.Uuid
+  concept         ChoidolsangConcept           @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+  /// 참석 인원
+  guestCount      Int
+  /// 스냅 촬영 여부
+  hasSnap         Boolean                      @default(false)
+  /// 추가 요청 사항
+  requests        String?                      @db.Text
+  /// 추가 요청 구성품 목록
+  extraComponents String[]                     @default([])
+  /// 최종 결제 금액 (원). 잔금 = 최종 결제 금액 - 예약금
+  totalAmount     Int
+  /// 예약금 (원)
+  depositAmount   Int                          @default(50000)
+  /// 예약 확정 날짜
+  confirmedOn     DateTime                     @db.Date
+  status          ChoidolsangReservationStatus @default(reserved)
+  /// 취소환불 처리 시각
+  cancelledAt     DateTime?                    @db.Timestamptz(3)
+  /// 업무 완료 처리 시각. 매출 집계 기준이 된다.
+  completedAt     DateTime?                    @db.Timestamptz(3)
+  createdAt       DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime                     @updatedAt @db.Timestamptz(3)
+
+  @@index([eventAt(sort: Desc)], map: "reservations_event_at_idx")
+  @@index([conceptId], map: "reservations_concept_id_idx")
+  @@map("reservations")
   @@schema("choidolsang")
 }

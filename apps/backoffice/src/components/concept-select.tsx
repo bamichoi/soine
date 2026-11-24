@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icon';
 import {
   type ConceptOption,
@@ -14,7 +14,12 @@ type ConceptSelectProps = {
   id: string;
   /** 선택한 컨셉 ID. 빈 문자열이면 선택 안 함 */
   value: string;
-  onChange: (conceptId: string) => void;
+  /** 고른 컨셉 ID와 그 항목(가격 등). 선택 안 함이면 option은 undefined */
+  onChange: (conceptId: string, option?: ConceptOption) => void;
+  /** 목록을 불러오면 한 번 알려 준다. 기본값(가격 등)을 채울 때 쓴다. */
+  onOptionsLoaded?: (options: ConceptOption[]) => void;
+  /** 비어 있을 때 보여 줄 글 (기본: 선택 안 함) */
+  emptyLabel?: string;
   /** 수정할 때 원래 고른 컨셉. 그사이 삭제됐어도 목록에 남겨 그대로 둘 수 있게 한다. */
   current: InquiryConceptRef | null;
 };
@@ -25,8 +30,18 @@ type LoadState =
   | { kind: 'loaded'; options: ConceptOption[] };
 
 // 돌상 컨셉 메뉴에 등록한 컨셉 중에서 고른다.
-export function ConceptSelect({ id, value, onChange, current }: ConceptSelectProps) {
+export function ConceptSelect({
+  id,
+  value,
+  onChange,
+  onOptionsLoaded,
+  emptyLabel = '선택 안 함',
+  current,
+}: ConceptSelectProps) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  // 목록은 처음 한 번만 불러온다. 부모가 넘긴 콜백이 바뀌어도 다시 부르지 않도록 ref로 둔다.
+  const onOptionsLoadedRef = useRef(onOptionsLoaded);
+  onOptionsLoadedRef.current = onOptionsLoaded;
 
   useEffect(() => {
     let isActive = true;
@@ -35,6 +50,7 @@ export function ConceptSelect({ id, value, onChange, current }: ConceptSelectPro
       .then((options) => {
         if (isActive) {
           setState({ kind: 'loaded', options });
+          onOptionsLoadedRef.current?.(options);
         }
       })
       .catch(() => {
@@ -58,10 +74,15 @@ export function ConceptSelect({ id, value, onChange, current }: ConceptSelectPro
           className="h-10 w-full appearance-none border border-[var(--line)] bg-[var(--surface)] px-3 pr-9 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60"
           disabled={state.kind !== 'loaded'}
           id={id}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) =>
+            onChange(
+              event.target.value,
+              options.find((option) => option.id === event.target.value),
+            )
+          }
           value={value}
         >
-          <option value="">{state.kind === 'loading' ? '불러오는 중...' : '선택 안 함'}</option>
+          <option value="">{state.kind === 'loading' ? '불러오는 중...' : emptyLabel}</option>
           {isCurrentMissing ? (
             <option value={current.id}>
               {current.name}
