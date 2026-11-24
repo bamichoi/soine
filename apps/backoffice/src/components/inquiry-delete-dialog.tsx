@@ -26,6 +26,7 @@ export function InquiryDeleteDialog({
           않습니다.
         </>
       }
+      conflictMessage="예약으로 이어진 문의는 삭제할 수 없습니다."
       notFoundMessage="이미 삭제된 문의입니다. 목록으로 돌아가 주세요."
       onClose={onClose}
       onConfirm={async () => {

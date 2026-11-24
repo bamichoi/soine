@@ -28,7 +28,11 @@ const CONCEPT = {
   updatedAt: new Date('2026-11-01T00:00:00.000Z'),
 };
 
-const INCLUDE = { desiredConcept: true, records: { orderBy: RECORD_ORDER } };
+const INCLUDE = {
+  desiredConcept: true,
+  records: { orderBy: RECORD_ORDER },
+  reservation: { select: { code: true } },
+};
 
 const INQUIRY = {
   code: '7K3FQ9AM',
@@ -353,19 +357,26 @@ describe('ChoidolsangInquiriesService edit and delete', () => {
     expect(mock.inquiry.updateMany).not.toHaveBeenCalled();
   });
 
-  it('soft-deletes by recording deletedAt', async () => {
+  it('soft-deletes by recording deletedAt, only when no reservation exists', async () => {
     await mock.service.remove('7k3fq9am');
 
     expect(mock.inquiry.updateMany).toHaveBeenCalledWith({
       data: { deletedAt: expect.any(Date) },
-      where: { code: '7K3FQ9AM', deletedAt: null },
+      where: { code: '7K3FQ9AM', deletedAt: null, reservation: { is: null } },
     });
   });
 
   it('returns 404 when deleting a missing or already deleted inquiry', async () => {
     mock.inquiry.updateMany.mockResolvedValue({ count: 0 });
+    mock.inquiry.findFirst.mockResolvedValue(null);
 
     await expect(mock.service.remove('7K3FQ9AM')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns 409 when deleting an inquiry that has a reservation', async () => {
+    mock.inquiry.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(mock.service.remove('7K3FQ9AM')).rejects.toBeInstanceOf(ConflictException);
   });
 });
 

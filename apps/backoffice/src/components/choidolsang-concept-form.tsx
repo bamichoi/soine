@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, type KeyboardEvent, type ReactNode, useId, useState } from 'react';
-import { Icon } from '@/components/icon';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import { StringListInput } from '@/components/string-list-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   CONCEPT_COMPONENT_MAX_LENGTH,
@@ -15,6 +15,8 @@ import {
   createConcept,
   updateConcept,
 } from '@/lib/choidolsang-concepts-api';
+import { toAmountText } from '@/lib/money';
+import { toStringListItems, toStringListValues } from '@/lib/string-list';
 import { type ConceptLoadState, useConcept } from '@/lib/use-concept';
 
 const LIST_PATH = '/choidolsang/concepts';
@@ -53,12 +55,6 @@ function Field({
   );
 }
 
-// 가격 칸은 숫자만 받고 천 단위 쉼표를 붙여 보여 준다.
-function toPriceText(value: string): string {
-  const digits = value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-  return digits ? Number(digits).toLocaleString('ko-KR') : '';
-}
-
 function buildInput(name: string, components: string[], priceText: string): ConceptInput | string {
   if (!name.trim()) {
     return '컨셉 이름을 입력해 주세요.';
@@ -77,92 +73,6 @@ function buildInput(name: string, components: string[], priceText: string): Conc
   return { components, name: name.trim(), price };
 }
 
-/** 화면에서만 쓰는 구성품 항목. 같은 이름이 있어도 구분하도록 key를 붙인다. */
-type ComponentItem = { key: number; value: string };
-
-let nextComponentKey = 0;
-
-function toComponentItems(components: string[]): ComponentItem[] {
-  return components.map((value) => ({ key: nextComponentKey++, value }));
-}
-
-type ComponentListInputProps = {
-  inputId: string;
-  components: ComponentItem[];
-  onChange: (components: ComponentItem[]) => void;
-};
-
-// 구성품을 하나씩 적고 + 로 목록에 더한다. 더한 항목은 x 로 뺀다.
-function ComponentListInput({ inputId, components, onChange }: ComponentListInputProps) {
-  const [draft, setDraft] = useState('');
-  const isFull = components.length >= CONCEPT_COMPONENTS_MAX_COUNT;
-
-  function addDraft() {
-    const item = draft.trim();
-
-    if (!item || isFull) {
-      return;
-    }
-
-    onChange([...components, { key: nextComponentKey++, value: item }]);
-    setDraft('');
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    // 한글 조합 중 Enter는 글자 확정이므로 무시한다.
-    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      addDraft();
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <input
-          className={`${CONTROL_CLASS_NAME} h-10`}
-          disabled={isFull}
-          id={inputId}
-          maxLength={CONCEPT_COMPONENT_MAX_LENGTH}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="예: 상차림 테이블"
-          value={draft}
-        />
-        <button
-          className="flex h-10 shrink-0 items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-medium hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!draft.trim() || isFull}
-          onClick={addDraft}
-          type="button"
-        >
-          <Icon className="size-4" name="plus" />
-          추가
-        </button>
-      </div>
-      {components.length > 0 ? (
-        <ul aria-label="추가한 구성품" className="flex flex-col">
-          {components.map((component) => (
-            <li
-              className="flex items-center justify-between gap-2 border-b border-[var(--line)] py-2 text-sm last:border-b-0"
-              key={component.key}
-            >
-              <span className="min-w-0 break-words">{component.value}</span>
-              <button
-                aria-label={`${component.value} 빼기`}
-                className="flex size-7 shrink-0 items-center justify-center text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                onClick={() => onChange(components.filter((item) => item.key !== component.key))}
-                type="button"
-              >
-                <Icon className="size-4" name="x" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 type ChoidolsangConceptFormProps = {
   /** 있으면 수정 폼 */
   concept?: Concept;
@@ -178,19 +88,15 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
     : `${LIST_PATH}${querySuffix}`;
   const idPrefix = useId();
   const [name, setName] = useState(concept?.name ?? '');
-  const [components, setComponents] = useState(() => toComponentItems(concept?.components ?? []));
-  const [priceText, setPriceText] = useState(concept ? toPriceText(String(concept.price)) : '');
+  const [components, setComponents] = useState(() => toStringListItems(concept?.components ?? []));
+  const [priceText, setPriceText] = useState(concept ? toAmountText(String(concept.price)) : '');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const id = (field: string) => `${idPrefix}-${field}`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = buildInput(
-      name,
-      components.map((item) => item.value),
-      priceText,
-    );
+    const result = buildInput(name, toStringListValues(components), priceText);
 
     if (typeof result === 'string') {
       setErrorMessage(result);
@@ -241,10 +147,14 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
           htmlFor={id('components')}
           label="구성품"
         >
-          <ComponentListInput
-            components={components}
+          <StringListInput
             inputId={id('components')}
+            items={components}
+            listLabel="추가한 구성품"
+            maxCount={CONCEPT_COMPONENTS_MAX_COUNT}
+            maxLength={CONCEPT_COMPONENT_MAX_LENGTH}
             onChange={setComponents}
+            placeholder="예: 상차림 테이블"
           />
         </Field>
 
@@ -254,7 +164,7 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
               className={`${CONTROL_CLASS_NAME} h-10 pr-9 text-right tabular-nums`}
               id={id('price')}
               inputMode="numeric"
-              onChange={(event) => setPriceText(toPriceText(event.target.value))}
+              onChange={(event) => setPriceText(toAmountText(event.target.value))}
               placeholder="0"
               required
               value={priceText}

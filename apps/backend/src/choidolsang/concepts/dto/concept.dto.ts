@@ -22,7 +22,7 @@ function trimString({ value }: { value: unknown }) {
 }
 
 // 구성품은 앞뒤 공백을 지우고 빈 항목은 뺀다. 문자열이 아닌 값은 검증에서 걸러지도록 그대로 둔다.
-function cleanComponents({ value }: { value: unknown }) {
+export function cleanStringList({ value }: { value: unknown }) {
   if (!Array.isArray(value)) {
     return value;
   }
@@ -42,7 +42,7 @@ export class ConceptDto {
 
   /** 구성품 목록. 화면에서 하나씩 추가한 순서대로 저장한다. */
   @IsOptional()
-  @Transform(cleanComponents)
+  @Transform(cleanStringList)
   @IsArray()
   @ArrayMaxSize(CONCEPT_COMPONENTS_MAX_COUNT)
   @IsString({ each: true })
