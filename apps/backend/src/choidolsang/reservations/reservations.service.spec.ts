@@ -40,11 +40,15 @@ const RESERVATION = {
 };
 
 const INPUT = {
+  babyGender: 'boy' as const,
+  babyName: '도윤',
   confirmedOn: '2026-11-24',
   conceptId: CONCEPT.id,
   customerName: '김고객',
   eventAt: '2026-12-05T11:00:00+09:00',
   eventLocation: '서울 강남구',
+  guestCount: 12,
+  hasSnap: false,
   inquiryCode: '7k3fq9am',
   totalAmount: 300000,
 };
@@ -105,7 +109,10 @@ describe('ChoidolsangReservationsService create', () => {
         confirmedOn: new Date('2026-11-24T00:00:00.000Z'),
         depositAmount: 50000,
         eventAt: new Date('2026-12-05T02:00:00.000Z'),
+        babyGender: 'boy',
+        babyName: '도윤',
         extraComponents: [],
+        guestCount: 12,
         hasSnap: false,
         inquiryId: 'inquiry-1',
         totalAmount: 300000,

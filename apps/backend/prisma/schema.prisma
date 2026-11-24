@@ -186,13 +186,15 @@ model ChoidolsangReservation {
   eventAt         DateTime                     @db.Timestamptz(3)
   /// 행사 장소
   eventLocation   String                       @db.VarChar(200)
-  babyName        String?                      @db.VarChar(100)
-  babyGender      ChoidolsangBabyGender?
+  /// 아기 이름
+  babyName        String                       @db.VarChar(100)
+  /// 아기 성별
+  babyGender      ChoidolsangBabyGender
   /// 돌상 컨셉
   conceptId       String                       @db.Uuid
   concept         ChoidolsangConcept           @relation(fields: [conceptId], references: [id], onDelete: Restrict)
   /// 참석 인원
-  guestCount      Int?
+  guestCount      Int
   /// 스냅 촬영 여부
   hasSnap         Boolean                      @default(false)
   /// 추가 요청 사항

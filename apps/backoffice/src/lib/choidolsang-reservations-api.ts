@@ -33,10 +33,10 @@ export type Reservation = {
   /** 행사 날짜·시간 (ISO 8601) */
   eventAt: string;
   eventLocation: string;
-  babyName: string | null;
-  babyGender: BabyGender | null;
+  babyName: string;
+  babyGender: BabyGender;
   concept: { id: string; name: string; isDeleted: boolean };
-  guestCount: number | null;
+  guestCount: number;
   hasSnap: boolean;
   requests: string | null;
   extraComponents: string[];
@@ -63,10 +63,10 @@ export type CreateReservationInput = {
   customerName: string;
   eventAt: string;
   eventLocation: string;
-  babyName: string | null;
-  babyGender: BabyGender | null;
+  babyName: string;
+  babyGender: BabyGender;
   conceptId: string;
-  guestCount: number | null;
+  guestCount: number;
   hasSnap: boolean;
   requests: string | null;
   extraComponents: string[];

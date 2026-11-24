@@ -66,32 +66,30 @@ export class CreateReservationDto {
   @MaxLength(200)
   eventLocation!: string;
 
-  @IsOptional()
-  @Transform(trimToNull)
+  /** 아기 이름 */
+  @Transform(trimString)
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  babyName?: string | null;
+  babyName!: string;
 
-  @IsOptional()
+  /** 아기 성별 */
   @IsIn(BABY_GENDERS)
-  babyGender?: (typeof BABY_GENDERS)[number] | null;
+  babyGender!: (typeof BABY_GENDERS)[number];
 
   /** 돌상 컨셉 ID */
   @IsUUID()
   conceptId!: string;
 
   /** 참석 인원 */
-  @IsOptional()
-  @Type(() => Number)
   @IsInt()
-  @Min(0)
+  @Min(1)
   @Max(10_000)
-  guestCount?: number | null;
+  guestCount!: number;
 
-  /** 스냅 촬영 여부 */
-  @IsOptional()
+  /** 스냅 촬영 포함 여부 */
   @IsBoolean()
-  hasSnap?: boolean;
+  hasSnap!: boolean;
 
   /** 추가 요청 사항 */
   @IsOptional()

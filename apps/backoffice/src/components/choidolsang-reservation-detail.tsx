@@ -15,8 +15,6 @@ import {
 } from '@/lib/choidolsang-reservations-api';
 import { formatWon } from '@/lib/money';
 
-const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
-
 const SECONDARY_BUTTON_CLASS_NAME =
   'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
 
@@ -71,13 +69,9 @@ function ReservationBody({ reservation }: { reservation: Reservation }) {
         <InfoItem label="예약자 성함">{reservation.customerName}</InfoItem>
         <InfoItem label="행사 날짜·시간">{formatSeoulDateTime(reservation.eventAt)}</InfoItem>
         <InfoItem label="행사 장소">{reservation.eventLocation}</InfoItem>
-        <InfoItem label="참석 인원">
-          {reservation.guestCount === null ? EMPTY_VALUE : `${reservation.guestCount}명`}
-        </InfoItem>
-        <InfoItem label="아기 이름">{reservation.babyName ?? EMPTY_VALUE}</InfoItem>
-        <InfoItem label="아기 성별">
-          {reservation.babyGender ? BABY_GENDER_LABELS[reservation.babyGender] : EMPTY_VALUE}
-        </InfoItem>
+        <InfoItem label="참석 인원">{reservation.guestCount}명</InfoItem>
+        <InfoItem label="아기 이름">{reservation.babyName}</InfoItem>
+        <InfoItem label="아기 성별">{BABY_GENDER_LABELS[reservation.babyGender]}</InfoItem>
         <InfoItem label="돌상 컨셉">
           {concept.isDeleted ? (
             <>
@@ -92,7 +86,7 @@ function ReservationBody({ reservation }: { reservation: Reservation }) {
             </Link>
           )}
         </InfoItem>
-        <InfoItem label="스냅 촬영">{reservation.hasSnap ? '포함' : '없음'}</InfoItem>
+        <InfoItem label="스냅 촬영">{reservation.hasSnap ? '포함' : '미포함'}</InfoItem>
         <InfoItem label="예약 확정 날짜">{formatInquiryDate(reservation.confirmedOn)}</InfoItem>
       </dl>
 

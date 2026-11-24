@@ -9,8 +9,6 @@ import { formatSeoulDateTime } from '@/lib/choidolsang-inquiries-api';
 import { listReservations, type ReservationListResponse } from '@/lib/choidolsang-reservations-api';
 import { formatWon } from '@/lib/money';
 
-const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
-
 const BUTTON_CLASS_NAME =
   'h-10 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
 
@@ -119,11 +117,7 @@ export function ChoidolsangReservationTable() {
                       <p className="truncate">{reservation.customerName}</p>
                     </td>
                     <td className="px-4 py-3">
-                      {reservation.babyName ? (
-                        <p className="truncate">{reservation.babyName}</p>
-                      ) : (
-                        EMPTY_VALUE
-                      )}
+                      <p className="truncate">{reservation.babyName}</p>
                     </td>
                     <td className="px-4 py-3">
                       <p className="truncate" title={reservation.concept.name}>

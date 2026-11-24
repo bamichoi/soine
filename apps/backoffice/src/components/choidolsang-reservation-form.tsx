@@ -43,7 +43,7 @@ type FormValues = {
   eventTime: string;
   eventLocation: string;
   babyName: string;
-  babyGender: BabyGender | '';
+  babyGender: BabyGender;
   conceptId: string;
   guestCountText: string;
   hasSnap: boolean;
@@ -62,7 +62,8 @@ function getInitialValues(inquiry: InquiryDetail): FormValues {
   const concept = inquiry.desiredConcept;
 
   return {
-    babyGender: '',
+    // 아기 성별은 둘 중 하나를 반드시 고른다. 기본은 남아.
+    babyGender: 'boy',
     babyName: '',
     conceptId: concept && !concept.isDeleted ? concept.id : '',
     confirmedOn: getSeoulToday(),
@@ -90,6 +91,14 @@ function validateRequired(values: FormValues): string | null {
 
   if (!values.eventLocation.trim()) {
     return '행사 장소를 입력해 주세요.';
+  }
+
+  if (!values.babyName.trim()) {
+    return '아기 이름을 입력해 주세요.';
+  }
+
+  if (!Number(values.guestCountText)) {
+    return '참석 인원을 1명 이상 입력해 주세요.';
   }
 
   if (!values.conceptId) {
@@ -123,8 +132,8 @@ function buildInput(inquiryCode: string, values: FormValues): CreateReservationI
   }
 
   return {
-    babyGender: values.babyGender || null,
-    babyName: values.babyName.trim() || null,
+    babyGender: values.babyGender,
+    babyName: values.babyName.trim(),
     conceptId: values.conceptId,
     confirmedOn: values.confirmedOn,
     customerName: values.customerName.trim(),
@@ -133,7 +142,7 @@ function buildInput(inquiryCode: string, values: FormValues): CreateReservationI
     eventAt: `${values.eventDate}T${values.eventTime}:00+09:00`,
     eventLocation: values.eventLocation.trim(),
     extraComponents: toStringListValues(values.extraComponents),
-    guestCount: values.guestCountText ? Number(values.guestCountText) : null,
+    guestCount: Number(values.guestCountText),
     hasSnap: values.hasSnap,
     inquiryCode,
     requests: values.requests.trim() || null,
@@ -280,7 +289,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
               value={values.eventLocation}
             />
           </FormField>
-          <FormField htmlFor={id('guest-count')} label="참석 인원">
+          <FormField htmlFor={id('guest-count')} label="참석 인원" required>
             <div className="relative sm:w-40">
               <input
                 className={`${CONTROL_CLASS_NAME} h-10 pr-9 text-right tabular-nums`}
@@ -289,6 +298,7 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
                 onChange={(event) =>
                   update('guestCountText', event.target.value.replace(/\D/g, '').slice(0, 5))
                 }
+                required
                 value={values.guestCountText}
               />
               <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
@@ -300,37 +310,26 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
 
         <section className="flex flex-col gap-5">
           <SectionTitle>아기</SectionTitle>
-          <FormField htmlFor={id('baby-name')} label="아기 이름">
+          <FormField htmlFor={id('baby-name')} label="아기 이름" required>
             <input
               className={`${CONTROL_CLASS_NAME} h-10 sm:w-64`}
               id={id('baby-name')}
               maxLength={100}
               onChange={(event) => update('babyName', event.target.value)}
+              required
               value={values.babyName}
             />
           </FormField>
-          <FormField hint="고른 버튼을 다시 누르면 선택이 풀립니다." label="아기 성별">
-            <div className="flex gap-2">
-              {BABY_GENDERS.map((gender) => {
-                const isSelected = values.babyGender === gender;
-
-                return (
-                  <button
-                    aria-pressed={isSelected}
-                    className={`flex h-10 items-center border px-4 text-sm ${
-                      isSelected
-                        ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
-                        : 'border-[var(--line)] hover:bg-[var(--background)]'
-                    }`}
-                    key={gender}
-                    onClick={() => update('babyGender', isSelected ? '' : gender)}
-                    type="button"
-                  >
-                    {BABY_GENDER_LABELS[gender]}
-                  </button>
-                );
-              })}
-            </div>
+          <FormField label="아기 성별" required>
+            <ChoiceButtons
+              label="아기 성별"
+              onChange={(gender) => update('babyGender', gender)}
+              options={BABY_GENDERS.map((gender) => ({
+                label: BABY_GENDER_LABELS[gender],
+                value: gender,
+              }))}
+              value={values.babyGender}
+            />
           </FormField>
         </section>
 
@@ -353,16 +352,16 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
               value={values.conceptId}
             />
           </FormField>
-          <FormField label="스냅 촬영">
-            <label className="flex h-10 cursor-pointer items-center gap-2 text-sm">
-              <input
-                checked={values.hasSnap}
-                className="size-4 accent-[var(--brand)]"
-                onChange={(event) => update('hasSnap', event.target.checked)}
-                type="checkbox"
-              />
-              스냅 촬영 포함
-            </label>
+          <FormField label="스냅 촬영" required>
+            <ChoiceButtons
+              label="스냅 촬영"
+              onChange={(hasSnap) => update('hasSnap', hasSnap)}
+              options={[
+                { label: '포함', value: true },
+                { label: '미포함', value: false },
+              ]}
+              value={values.hasSnap}
+            />
           </FormField>
           <FormField
             hint="입력하고 추가를 누르거나 Enter를 치면 목록에 더해집니다."
@@ -452,6 +451,46 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
         </div>
       </footer>
     </form>
+  );
+}
+
+type ChoiceButtonsProps<T extends string | boolean> = {
+  label: string;
+  options: { label: string; value: T }[];
+  value: T;
+  onChange: (value: T) => void;
+};
+
+// 둘 이상 중 하나를 반드시 고르는 버튼 묶음. 선택은 풀 수 없다.
+function ChoiceButtons<T extends string | boolean>({
+  label,
+  options,
+  value,
+  onChange,
+}: ChoiceButtonsProps<T>) {
+  return (
+    <fieldset className="flex gap-2">
+      <legend className="sr-only">{label}</legend>
+      {options.map((option) => {
+        const isSelected = option.value === value;
+
+        return (
+          <button
+            aria-pressed={isSelected}
+            className={`flex h-10 items-center border px-4 text-sm ${
+              isSelected
+                ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                : 'border-[var(--line)] hover:bg-[var(--background)]'
+            }`}
+            key={String(option.value)}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </fieldset>
   );
 }
 

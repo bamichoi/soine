@@ -37,10 +37,10 @@ export type Reservation = {
   customerName: string;
   eventAt: string;
   eventLocation: string;
-  babyName: string | null;
-  babyGender: ChoidolsangBabyGender | null;
+  babyName: string;
+  babyGender: ChoidolsangBabyGender;
   concept: ReservationConceptRef;
-  guestCount: number | null;
+  guestCount: number;
   hasSnap: boolean;
   requests: string | null;
   extraComponents: string[];
@@ -106,16 +106,16 @@ function toReservation(reservation: ReservationWithRelations): Reservation {
 // 입력을 저장할 값으로 바꾼다. 비운 선택 항목은 null, 날짜만 받는 값은 UTC 자정으로 넣는다.
 function toReservationData(input: CreateReservationDto, depositAmount: number) {
   return {
-    babyGender: input.babyGender ?? null,
-    babyName: input.babyName ?? null,
+    babyGender: input.babyGender,
+    babyName: input.babyName,
     confirmedOn: new Date(`${input.confirmedOn}T00:00:00.000Z`),
     customerName: input.customerName,
     depositAmount,
     eventAt: new Date(input.eventAt),
     eventLocation: input.eventLocation,
     extraComponents: input.extraComponents ?? [],
-    guestCount: input.guestCount ?? null,
-    hasSnap: input.hasSnap ?? false,
+    guestCount: input.guestCount,
+    hasSnap: input.hasSnap,
     requests: input.requests ?? null,
     totalAmount: input.totalAmount,
   };
