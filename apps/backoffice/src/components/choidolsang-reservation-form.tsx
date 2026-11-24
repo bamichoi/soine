@@ -309,27 +309,27 @@ function ReservationForm({ inquiry }: { inquiry: InquiryDetail }) {
               value={values.babyName}
             />
           </FormField>
-          <FormField label="아기 성별">
-            <div className="flex gap-2" role="radiogroup" aria-label="아기 성별">
-              {(['', ...BABY_GENDERS] as const).map((gender) => (
-                <label
-                  className={`flex h-10 cursor-pointer items-center border px-4 text-sm ${
-                    values.babyGender === gender
-                      ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
-                      : 'border-[var(--line)] hover:bg-[var(--background)]'
-                  }`}
-                  key={gender || 'none'}
-                >
-                  <input
-                    checked={values.babyGender === gender}
-                    className="sr-only"
-                    name={id('baby-gender')}
-                    onChange={() => update('babyGender', gender)}
-                    type="radio"
-                  />
-                  {gender ? BABY_GENDER_LABELS[gender] : '미정'}
-                </label>
-              ))}
+          <FormField hint="고른 버튼을 다시 누르면 선택이 풀립니다." label="아기 성별">
+            <div className="flex gap-2">
+              {BABY_GENDERS.map((gender) => {
+                const isSelected = values.babyGender === gender;
+
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={`flex h-10 items-center border px-4 text-sm ${
+                      isSelected
+                        ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                        : 'border-[var(--line)] hover:bg-[var(--background)]'
+                    }`}
+                    key={gender}
+                    onClick={() => update('babyGender', isSelected ? '' : gender)}
+                    type="button"
+                  >
+                    {BABY_GENDER_LABELS[gender]}
+                  </button>
+                );
+              })}
             </div>
           </FormField>
         </section>
