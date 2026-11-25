@@ -1,0 +1,74 @@
+export type KkiruConsultationStatus =
+  | 'consulting'
+  | 'meeting'
+  | 'contracting'
+  | 'contracted'
+  | 'contract_cancelled';
+
+export type KkiruMeetingStatus =
+  | 'meeting'
+  | 'contracting'
+  | 'contracted'
+  | 'contract_cancelled'
+  | 'stopped';
+
+export type KkiruContractStatus = 'contracting' | 'completed' | 'cancelled';
+
+export type KkiruListingStatus = 'available' | 'contracted';
+
+export const CONSULTATION_STATUS_LABELS: Record<KkiruConsultationStatus, string> = {
+  consulting: '상담중',
+  // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
+  contract_cancelled: '계약취소',
+  contracted: '계약완료',
+  contracting: '계약중',
+  meeting: '미팅중',
+};
+
+export const MEETING_STATUS_LABELS: Record<KkiruMeetingStatus, string> = {
+  // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
+  contract_cancelled: '계약취소',
+  contracted: '계약완료',
+  contracting: '계약중',
+  meeting: '미팅중',
+  stopped: '진행중단',
+};
+
+export const CONTRACT_STATUS_LABELS: Record<KkiruContractStatus, string> = {
+  cancelled: '계약취소',
+  completed: '계약완료',
+  contracting: '계약중',
+};
+
+export const LISTING_STATUS_LABELS: Record<KkiruListingStatus, string> = {
+  available: '계약가능',
+  contracted: '계약완료',
+};
+
+/** 상태 배지 색. 진행 단계(파랑), 완료(초록), 멈춤·취소(회색·빨강) */
+export const STATUS_TONE_CLASS_NAMES = {
+  active: 'bg-[var(--brand-soft)] text-[var(--brand)]',
+  done: 'bg-[var(--success-soft)] text-[var(--success)]',
+  idle: 'bg-[var(--warning-soft)] text-[var(--warning)]',
+  muted: 'bg-[var(--background)] text-[var(--muted)]',
+  negative: 'bg-[var(--error-soft)] text-[var(--error)]',
+} as const;
+
+export type StatusTone = keyof typeof STATUS_TONE_CLASS_NAMES;
+
+const TONES: Record<string, StatusTone> = {
+  available: 'active',
+  cancelled: 'negative',
+  completed: 'done',
+  consulting: 'idle',
+  // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
+  contract_cancelled: 'negative',
+  contracted: 'done',
+  contracting: 'active',
+  meeting: 'active',
+  stopped: 'muted',
+};
+
+export function statusTone(status: string): StatusTone {
+  return TONES[status] ?? 'muted';
+}
