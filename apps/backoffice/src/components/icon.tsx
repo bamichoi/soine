@@ -19,6 +19,7 @@ const ICON_NAMES = [
   'megaphone',
   'menu',
   'message',
+  'phone',
   'plus',
   'sparkles',
   'x',
