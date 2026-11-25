@@ -9,6 +9,7 @@ const VALID = {
   conceptId: '11111111-1111-4111-8111-111111111111',
   confirmedOn: '2026-11-24',
   customerName: '김고객',
+  customerPhone: '010-1234-5678',
   eventAt: '2026-12-05T11:00:00+09:00',
   eventLocation: '서울 강남구',
   guestCount: 12,
@@ -33,6 +34,21 @@ describe('CreateReservationDto', () => {
 
     await expect(validateInput({ ...rest, babyName: '  ' })).resolves.toEqual(
       expect.arrayContaining(['babyName', 'babyGender', 'guestCount', 'hasSnap']),
+    );
+  });
+
+  it('accepts a phone number with hyphens and stores digits only', () => {
+    const dto = plainToInstance(CreateReservationDto, VALID);
+
+    expect(dto.customerPhone).toBe('01012345678');
+  });
+
+  it('rejects a phone number that is not a Korean number', async () => {
+    await expect(validateInput({ ...VALID, customerPhone: '12345' })).resolves.toContain(
+      'customerPhone',
+    );
+    await expect(validateInput({ ...VALID, customerPhone: '010-abcd-5678' })).resolves.toContain(
+      'customerPhone',
     );
   });
 

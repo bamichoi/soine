@@ -24,6 +24,7 @@ const RESERVATION = {
   confirmedOn: new Date('2026-11-24T00:00:00.000Z'),
   createdAt: new Date('2026-11-24T01:00:00.000Z'),
   customerName: '김고객',
+  customerPhone: '01012345678',
   depositAmount: 50000,
   eventAt: new Date('2026-12-05T02:00:00.000Z'),
   eventLocation: '서울 강남구',
@@ -45,6 +46,7 @@ const INPUT = {
   confirmedOn: '2026-11-24',
   conceptId: CONCEPT.id,
   customerName: '김고객',
+  customerPhone: '01012345678',
   eventAt: '2026-12-05T11:00:00+09:00',
   eventLocation: '서울 강남구',
   guestCount: 12,
@@ -65,7 +67,9 @@ function createPrismaMock() {
     findFirst: jest.fn(
       (): Promise<unknown> => Promise.resolve({ id: 'inquiry-1', status: 'pending' }),
     ),
-    findUniqueOrThrow: jest.fn(() => Promise.resolve({ id: 'inquiry-1', status: 'pending' })),
+    findUniqueOrThrow: jest.fn(() =>
+      Promise.resolve({ code: '7K3FQ9AM', id: 'inquiry-1', status: 'pending' }),
+    ),
     update: jest.fn(() => Promise.resolve({})),
   };
   const concept = {
@@ -98,15 +102,16 @@ describe('ChoidolsangReservationsService create', () => {
     mock = createPrismaMock();
   });
 
-  it('creates a reservation from the inquiry and confirms the inquiry', async () => {
+  it('creates a reservation numbered like its inquiry and confirms the inquiry', async () => {
     const result = await mock.service.create(INPUT);
 
     expect(mock.tx.$executeRaw).toHaveBeenCalled();
     expect(mock.reservation.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        code: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{8}$/),
+        code: '7K3FQ9AM',
         conceptId: CONCEPT.id,
         confirmedOn: new Date('2026-11-24T00:00:00.000Z'),
+        customerPhone: '01012345678',
         depositAmount: 50000,
         eventAt: new Date('2026-12-05T02:00:00.000Z'),
         babyGender: 'boy',
@@ -133,7 +138,11 @@ describe('ChoidolsangReservationsService create', () => {
   });
 
   it('refuses an inquiry that is already confirmed or cancelled', async () => {
-    mock.inquiry.findUniqueOrThrow.mockResolvedValue({ id: 'inquiry-1', status: 'confirmed' });
+    mock.inquiry.findUniqueOrThrow.mockResolvedValue({
+      code: '7K3FQ9AM',
+      id: 'inquiry-1',
+      status: 'confirmed',
+    });
 
     await expect(mock.service.create(INPUT)).rejects.toBeInstanceOf(ConflictException);
     expect(mock.reservation.create).not.toHaveBeenCalled();
@@ -206,5 +215,112 @@ describe('ChoidolsangReservationsService status changes', () => {
     mock.reservation.findUnique.mockResolvedValue(null);
 
     await expect(mock.service.complete('ZZZZZZZZ')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('ChoidolsangReservationsService calendar', () => {
+  let mock: ReturnType<typeof createPrismaMock>;
+
+  beforeEach(() => {
+    mock = createPrismaMock();
+    mock.reservation.findMany.mockResolvedValue([
+      {
+        code: 'R7K3FQ9A',
+        concept: { name: '한복 클래식' },
+        customerName: '김고객',
+        eventAt: new Date('2026-12-05T02:00:00.000Z'),
+        eventLocation: '서울 강남구',
+        status: 'reserved',
+      },
+    ]);
+  });
+
+  it('lists reserved and completed reservations in the Korean date range', async () => {
+    const items = await mock.service.listForCalendar({ from: '2026-11-29', to: '2027-01-10' });
+
+    expect(mock.reservation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          eventAt: {
+            gte: new Date('2026-11-28T15:00:00.000Z'),
+            lt: new Date('2027-01-09T15:00:00.000Z'),
+          },
+          status: { in: ['reserved', 'completed'] },
+        },
+      }),
+    );
+    expect(items).toEqual([
+      {
+        code: 'R7K3FQ9A',
+        conceptName: '한복 클래식',
+        customerName: '김고객',
+        eventAt: '2026-12-05T02:00:00.000Z',
+        eventLocation: '서울 강남구',
+        status: 'reserved',
+      },
+    ]);
+  });
+
+  it('refuses an empty, reversed or too long range', async () => {
+    await expect(
+      mock.service.listForCalendar({ from: '2026-12-01', to: '2026-12-01' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      mock.service.listForCalendar({ from: '2026-01-01', to: '2026-12-31' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('ChoidolsangReservationsService update', () => {
+  const { inquiryCode: _inquiryCode, ...FIELDS } = INPUT;
+  const OTHER_CONCEPT_ID = '22222222-2222-4222-8222-222222222222';
+  let mock: ReturnType<typeof createPrismaMock>;
+
+  beforeEach(() => {
+    mock = createPrismaMock();
+    mock.reservation.findUnique.mockResolvedValue({
+      ...RESERVATION,
+      conceptId: CONCEPT.id,
+      status: 'reserved',
+    });
+  });
+
+  it('updates a reserved reservation, guarded by the reserved status', async () => {
+    await mock.service.update('r7k3fq9a', { ...FIELDS, guestCount: 20 });
+
+    expect(mock.reservation.updateMany).toHaveBeenCalledWith({
+      data: expect.objectContaining({ conceptId: CONCEPT.id, guestCount: 20 }),
+      where: { code: 'R7K3FQ9A', status: 'reserved' },
+    });
+    // 같은 컨셉이면 삭제 여부를 다시 확인하지 않는다.
+    expect(mock.concept.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('checks a newly chosen concept', async () => {
+    mock.concept.findFirst.mockResolvedValue(null);
+
+    await expect(
+      mock.service.update('R7K3FQ9A', { ...FIELDS, conceptId: OTHER_CONCEPT_ID }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mock.reservation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses to edit a completed or cancelled reservation', async () => {
+    mock.reservation.findUnique.mockResolvedValue({ ...RESERVATION, status: 'completed' });
+
+    await expect(mock.service.update('R7K3FQ9A', FIELDS)).rejects.toBeInstanceOf(ConflictException);
+    expect(mock.reservation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses a deposit larger than the total', async () => {
+    await expect(
+      mock.service.update('R7K3FQ9A', { ...FIELDS, depositAmount: 999999 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns 404 for an unknown reservation', async () => {
+    mock.reservation.findUnique.mockResolvedValue(null);
+
+    await expect(mock.service.update('ZZZZZZZZ', FIELDS)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

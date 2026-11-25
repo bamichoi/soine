@@ -13,15 +13,17 @@ import {
 } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import { generateInquiryCode, normalizeInquiryCode } from '../inquiries/inquiry-code';
+import { normalizeInquiryCode } from '../inquiries/inquiry-code';
 import {
   type CreateReservationDto,
   DEFAULT_DEPOSIT_AMOUNT,
   type ListReservationsQueryDto,
+  type ReservationCalendarQueryDto,
+  type ReservationFieldsDto,
+  type UpdateReservationDto,
 } from './dto/create-reservation.dto';
 
 export const RESERVATION_PAGE_SIZE = 20;
-const CODE_GENERATION_ATTEMPTS = 5;
 
 /** 예약을 만들 수 있는 문의 상태. 예약확정·취소된 문의는 이미 예약이 있다. */
 const RESERVABLE_INQUIRY_STATUSES = new Set(['pending', 'rejected']);
@@ -30,11 +32,13 @@ export type ReservationConceptRef = { id: string; name: string; isDeleted: boole
 
 export type Reservation = {
   id: string;
-  /** 예약 번호 */
+  /** 예약 번호. 예약을 만든 문의의 문의 번호와 같다. */
   code: string;
   /** 예약을 만든 문의의 문의 번호 */
   inquiryCode: string;
   customerName: string;
+  /** 예약자 연락처 (숫자만) */
+  customerPhone: string;
   eventAt: string;
   eventLocation: string;
   babyName: string;
@@ -56,6 +60,20 @@ export type Reservation = {
   createdAt: string;
   updatedAt: string;
 };
+
+/** 달력 칸에 표시할 짧은 예약 정보 */
+export type ReservationCalendarItem = {
+  code: string;
+  eventAt: string;
+  customerName: string;
+  eventLocation: string;
+  conceptName: string;
+  status: ChoidolsangReservationStatus;
+};
+
+/** 달력 조회 기간 최대 길이. 6주짜리 월 달력(42일)을 넉넉히 덮는다. */
+export const CALENDAR_MAX_DAYS = 62;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ReservationListResponse = {
   items: Reservation[];
@@ -88,6 +106,7 @@ function toReservation(reservation: ReservationWithRelations): Reservation {
     confirmedOn: reservation.confirmedOn.toISOString().slice(0, 10),
     createdAt: reservation.createdAt.toISOString(),
     customerName: reservation.customerName,
+    customerPhone: reservation.customerPhone,
     depositAmount: reservation.depositAmount,
     eventAt: reservation.eventAt.toISOString(),
     eventLocation: reservation.eventLocation,
@@ -104,12 +123,13 @@ function toReservation(reservation: ReservationWithRelations): Reservation {
 }
 
 // 입력을 저장할 값으로 바꾼다. 비운 선택 항목은 null, 날짜만 받는 값은 UTC 자정으로 넣는다.
-function toReservationData(input: CreateReservationDto, depositAmount: number) {
+function toReservationData(input: ReservationFieldsDto, depositAmount: number) {
   return {
     babyGender: input.babyGender,
     babyName: input.babyName,
     confirmedOn: new Date(`${input.confirmedOn}T00:00:00.000Z`),
     customerName: input.customerName,
+    customerPhone: input.customerPhone,
     depositAmount,
     eventAt: new Date(input.eventAt),
     eventLocation: input.eventLocation,
@@ -160,6 +180,45 @@ export class ChoidolsangReservationsService {
     };
   }
 
+  /**
+   * 달력에 표시할 예약. 기간은 한국 날짜 기준 [from, to)이며, 취소환불된 예약은 빼고
+   * 예약중·완료 예약만 행사 시각 순으로 돌려준다.
+   */
+  async listForCalendar({
+    from,
+    to,
+  }: ReservationCalendarQueryDto): Promise<ReservationCalendarItem[]> {
+    const start = new Date(`${from}T00:00:00+09:00`);
+    const end = new Date(`${to}T00:00:00+09:00`);
+    const days = (end.getTime() - start.getTime()) / DAY_MS;
+
+    if (days <= 0 || days > CALENDAR_MAX_DAYS) {
+      throw new BadRequestException(`Range must be 1 to ${CALENDAR_MAX_DAYS} days`);
+    }
+
+    const reservations = await this.prisma.choidolsangReservation.findMany({
+      orderBy: [{ eventAt: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        code: true,
+        concept: { select: { name: true } },
+        customerName: true,
+        eventAt: true,
+        eventLocation: true,
+        status: true,
+      },
+      where: { eventAt: { gte: start, lt: end }, status: { in: ['reserved', 'completed'] } },
+    });
+
+    return reservations.map((reservation) => ({
+      code: reservation.code,
+      conceptName: reservation.concept.name,
+      customerName: reservation.customerName,
+      eventAt: reservation.eventAt.toISOString(),
+      eventLocation: reservation.eventLocation,
+      status: reservation.status,
+    }));
+  }
+
   async findByCode(rawCode: string): Promise<Reservation> {
     const code = normalizeInquiryCode(rawCode);
     const reservation = code
@@ -194,19 +253,17 @@ export class ChoidolsangReservationsService {
 
     const data = toReservationData(input, depositAmount);
 
-    // 예약 번호가 우연히 겹치면(32^8분의 1) 새 번호로 트랜잭션을 다시 시도한다.
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        return this.findByCode(await this.createFromInquiry(inquiryCode, input.conceptId, data));
-      } catch (error) {
-        if (isUniqueViolation(error, 'inquiryId')) {
-          throw new ConflictException('Inquiry already has a reservation');
-        }
-
-        if (!isUniqueViolation(error, 'code') || attempt >= CODE_GENERATION_ATTEMPTS) {
-          throw error;
-        }
+    try {
+      return await this.findByCode(
+        await this.createFromInquiry(inquiryCode, input.conceptId, data),
+      );
+    } catch (error) {
+      // 같은 문의로 동시에 두 번 만들면 문의 ID·예약 번호(= 문의 번호) 유일 제약에 걸린다.
+      if (isUniqueViolation(error, 'inquiryId') || isUniqueViolation(error, 'code')) {
+        throw new ConflictException('Inquiry already has a reservation');
       }
+
+      throw error;
     }
   }
 
@@ -220,7 +277,8 @@ export class ChoidolsangReservationsService {
       await this.assertSelectableConcept(tx, conceptId);
 
       const reservation = await tx.choidolsangReservation.create({
-        data: { ...data, code: generateInquiryCode(), conceptId, inquiryId: inquiry.id },
+        // 예약 번호는 문의 번호와 같게 둔다. 문의 하나에 예약 하나라 겹치지 않는다.
+        data: { ...data, code: inquiry.code, conceptId, inquiryId: inquiry.id },
       });
       await tx.choidolsangInquiry.update({
         data: { rejectionReason: null, status: 'confirmed' },
@@ -229,6 +287,54 @@ export class ChoidolsangReservationsService {
 
       return reservation.code;
     });
+  }
+
+  /**
+   * 예약중인 예약을 고친다. 완료·취소환불된 예약은 고칠 수 없다(409).
+   * 돌상 컨셉은 새로 고를 때만 숨김 삭제되지 않은 것인지 확인한다(이미 고른 컨셉은 그대로 둘 수 있다).
+   */
+  async update(rawCode: string, input: UpdateReservationDto): Promise<Reservation> {
+    const code = normalizeInquiryCode(rawCode);
+    const depositAmount = input.depositAmount ?? DEFAULT_DEPOSIT_AMOUNT;
+
+    if (!code) {
+      throw reservationNotFound();
+    }
+
+    if (depositAmount > input.totalAmount) {
+      throw new BadRequestException('depositAmount must not exceed totalAmount');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const current = await tx.choidolsangReservation.findUnique({
+        select: { conceptId: true, status: true },
+        where: { code },
+      });
+
+      if (!current) {
+        throw reservationNotFound();
+      }
+
+      if (current.status !== 'reserved') {
+        throw new ConflictException(`Reservation status must be reserved but is ${current.status}`);
+      }
+
+      if (input.conceptId !== current.conceptId) {
+        await this.assertSelectableConcept(tx, input.conceptId);
+      }
+
+      // 읽은 뒤 그사이 취소·완료됐다면 덮어쓰지 않도록 상태를 조건으로 건다.
+      const { count } = await tx.choidolsangReservation.updateMany({
+        data: { ...toReservationData(input, depositAmount), conceptId: input.conceptId },
+        where: { code, status: 'reserved' },
+      });
+
+      if (count === 0) {
+        throw new ConflictException('Reservation changed while editing');
+      }
+    });
+
+    return this.findByCode(code);
   }
 
   /** 예약중인 예약을 취소환불로 바꾸고, 이어진 문의를 취소로 바꾼다. */
@@ -297,7 +403,7 @@ export class ChoidolsangReservationsService {
 
     await tx.$executeRaw`SELECT 1 FROM "choidolsang"."inquiries" WHERE "id" = ${inquiry.id}::uuid FOR UPDATE`;
     const locked = await tx.choidolsangInquiry.findUniqueOrThrow({
-      select: { id: true, status: true },
+      select: { code: true, id: true, status: true },
       where: { id: inquiry.id },
     });
 

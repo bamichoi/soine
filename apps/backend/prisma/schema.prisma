@@ -182,6 +182,8 @@ model ChoidolsangReservation {
   inquiry         ChoidolsangInquiry           @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
   /// 예약자 성함
   customerName    String                       @db.VarChar(100)
+  /// 예약자 연락처. 숫자만 저장한다 (예: 01012345678)
+  customerPhone   String                       @db.VarChar(20)
   /// 행사 날짜·시간
   eventAt         DateTime                     @db.Timestamptz(3)
   /// 행사 장소

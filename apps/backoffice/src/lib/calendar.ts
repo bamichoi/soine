@@ -66,3 +66,19 @@ export function buildMonthDays({ year, month }: YearMonth): CalendarDay[] {
     };
   });
 }
+
+/** YYYY-MM-DD에 날짜를 더한다. */
+export function addDays(dateKey: string, amount: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + amount));
+
+  return toDateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+/** 2026-11-24 → 11월 24일 (화) */
+export function formatDayHeading(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+  return `${month}월 ${day}일 (${WEEKDAY_LABELS[weekday]})`;
+}

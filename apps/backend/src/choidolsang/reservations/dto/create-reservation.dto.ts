@@ -39,20 +39,22 @@ function trimToNull({ value }: { value: unknown }) {
   return trimmed === '' ? null : trimmed;
 }
 
-/** 문의에서 예약을 만든다. 금액은 원 단위 정수다. */
-export class CreateReservationDto {
-  /** 예약을 만들 문의의 문의 번호 */
-  @Transform(trimString)
-  @IsString()
-  @Matches(/^[0-9A-Za-z]{1,16}$/)
-  inquiryCode!: string;
-
+/** 예약 추가·수정에 공통으로 쓰는 항목. 수정할 때도 모두 다시 보낸다. 금액은 원 단위 정수다. */
+export class ReservationFieldsDto {
   /** 예약자 성함 */
   @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   customerName!: string;
+
+  /** 예약자 연락처. 하이픈·공백은 지우고 숫자만 받는다 (예: 01012345678) */
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.replace(/[\s-]/g, '') : value,
+  )
+  @IsString()
+  @Matches(/^0\d{8,10}$/, { message: 'customerPhone must be a Korean phone number' })
+  customerPhone!: string;
 
   /** 행사 날짜·시간 (시간대 포함 ISO 8601) */
   @IsISO8601({ strict: true })
@@ -125,10 +127,33 @@ export class CreateReservationDto {
   confirmedOn!: string;
 }
 
+/** 문의에서 예약을 만든다. */
+export class CreateReservationDto extends ReservationFieldsDto {
+  /** 예약을 만들 문의의 문의 번호 */
+  @Transform(trimString)
+  @IsString()
+  @Matches(/^[0-9A-Za-z]{1,16}$/)
+  inquiryCode!: string;
+}
+
+/** 예약중인 예약을 고친다. 문의는 바꿀 수 없다. */
+export class UpdateReservationDto extends ReservationFieldsDto {}
+
 export class ListReservationsQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
+}
+
+/** 달력에 표시할 기간. 한국 날짜 기준이며 to는 포함하지 않는다. */
+export class ReservationCalendarQueryDto {
+  /** 시작 날짜 (YYYY-MM-DD, 포함) */
+  @DateOnlyField()
+  from!: string;
+
+  /** 끝 날짜 (YYYY-MM-DD, 미포함) */
+  @DateOnlyField()
+  to!: string;
 }
