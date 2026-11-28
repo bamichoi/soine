@@ -14,7 +14,8 @@ export type KkiruMeetingStatus =
 
 export type KkiruContractStatus = 'contracting' | 'completed' | 'cancelled';
 
-export type KkiruListingStatus = 'available' | 'contracted';
+/** 매물 상태. 미팅중·계약중은 걸린 미팅 상태에서 백엔드가 계산한다. */
+export type KkiruListingStatus = 'available' | 'meeting' | 'contracting' | 'contracted';
 
 export const CONSULTATION_STATUS_LABELS: Record<KkiruConsultationStatus, string> = {
   consulting: '상담중',
@@ -37,13 +38,22 @@ export const MEETING_STATUS_LABELS: Record<KkiruMeetingStatus, string> = {
 export const CONTRACT_STATUS_LABELS: Record<KkiruContractStatus, string> = {
   cancelled: '계약취소',
   completed: '계약완료',
-  contracting: '계약중',
+  contracting: '계약예정',
 };
 
 export const LISTING_STATUS_LABELS: Record<KkiruListingStatus, string> = {
   available: '계약가능',
   contracted: '계약완료',
+  contracting: '계약중',
+  meeting: '미팅중',
 };
+
+export const LISTING_STATUSES: KkiruListingStatus[] = [
+  'available',
+  'meeting',
+  'contracting',
+  'contracted',
+];
 
 /** 상태 배지 색. 진행 단계(파랑), 완료(초록), 멈춤·취소(회색·빨강) */
 export const STATUS_TONE_CLASS_NAMES = {
@@ -57,7 +67,7 @@ export const STATUS_TONE_CLASS_NAMES = {
 export type StatusTone = keyof typeof STATUS_TONE_CLASS_NAMES;
 
 const TONES: Record<string, StatusTone> = {
-  available: 'active',
+  available: 'idle',
   cancelled: 'negative',
   completed: 'done',
   consulting: 'idle',

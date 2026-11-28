@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -56,6 +57,12 @@ export class ConceptDto {
   price!: number;
 }
 
+export const CONCEPT_SEARCH_FIELDS = ['all', 'name', 'components'] as const;
+export type ConceptSearchField = (typeof CONCEPT_SEARCH_FIELDS)[number];
+export const CONCEPT_SORT_FIELDS = ['name', 'price', 'createdAt'] as const;
+export type ConceptSortField = (typeof CONCEPT_SORT_FIELDS)[number];
+export const CONCEPT_SORT_ORDERS = ['asc', 'desc'] as const;
+
 export class ListConceptsQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -63,10 +70,23 @@ export class ListConceptsQueryDto {
   @Min(1)
   page?: number;
 
-  /** 이름 검색어 (부분 일치) */
+  /** 검색어 (부분 일치) */
   @IsOptional()
   @Transform(trimString)
   @IsString()
   @MaxLength(100)
   q?: string;
+
+  /** 검색 항목. all이면 이름과 구성품에서 모두 찾는다. */
+  @IsOptional()
+  @IsIn(CONCEPT_SEARCH_FIELDS)
+  field?: ConceptSearchField;
+
+  @IsOptional()
+  @IsIn(CONCEPT_SORT_FIELDS)
+  sort?: ConceptSortField;
+
+  @IsOptional()
+  @IsIn(CONCEPT_SORT_ORDERS)
+  order?: (typeof CONCEPT_SORT_ORDERS)[number];
 }

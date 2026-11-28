@@ -27,13 +27,6 @@ import { generateInquiryCode, normalizeInquiryCode } from './inquiry-code';
 export const INQUIRY_PAGE_SIZE = 20;
 const CODE_GENERATION_ATTEMPTS = 5;
 
-const STATUS_LABELS: Record<ChoidolsangInquiryStatus, string> = {
-  cancelled: '취소',
-  confirmed: '예약확정',
-  pending: '대기',
-  rejected: '거절',
-};
-
 /** 문의가 참조하는 돌상 컨셉 */
 export type InquiryConceptRef = {
   id: string;
@@ -90,23 +83,12 @@ export type InquiryListResponse = {
 type InquiryWhere = Prisma.ChoidolsangInquiryWhereInput;
 type InquiryOrderBy = Prisma.ChoidolsangInquiryOrderByWithRelationInput;
 
-// 상태는 화면 표시 이름(대기, 예약확정, 거절)이나 값(pending 등)의 일부로 찾는다.
-function matchStatuses(query: string): ChoidolsangInquiryStatus[] {
-  const lowerQuery = query.toLowerCase();
-
-  return (Object.keys(STATUS_LABELS) as ChoidolsangInquiryStatus[]).filter(
-    (status) => STATUS_LABELS[status].includes(query) || status.includes(lowerQuery),
-  );
-}
-
 function buildFieldCondition(field: Exclude<InquirySearchField, 'all'>, query: string) {
   switch (field) {
     case 'code': {
       const code = normalizeInquiryCode(query.replace(/^#/, ''));
       return code === null ? null : ({ code: { contains: code } } satisfies InquiryWhere);
     }
-    case 'status':
-      return { status: { in: matchStatuses(query) } } satisfies InquiryWhere;
     case 'content':
       // 문의 내용은 로그의 모든 기록에서 찾는다.
       return {
@@ -132,7 +114,7 @@ export function buildInquiryWhere(field: InquirySearchField, query: string): Inq
     return buildFieldCondition(field, query) ?? { id: { in: [] } };
   }
 
-  const conditions = (['code', 'content', 'location', 'desiredConcept', 'status'] as const)
+  const conditions = (['code', 'content', 'location', 'desiredConcept'] as const)
     .map((searchField) => buildFieldCondition(searchField, query))
     .filter((condition): condition is NonNullable<typeof condition> => condition !== null);
 
@@ -268,8 +250,13 @@ export class ChoidolsangInquiriesService {
     page = 1,
     q = '',
     sort = 'inquiredOn',
+    status,
   }: ListInquiriesQueryDto = {}): Promise<InquiryListResponse> {
-    const where = { ...buildInquiryWhere(field, q), ...NOT_DELETED };
+    const where = {
+      ...buildInquiryWhere(field, q),
+      ...(status ? { status } : {}),
+      ...NOT_DELETED,
+    };
     const [total, inquiries] = await this.prisma.$transaction([
       this.prisma.choidolsangInquiry.count({ where }),
       this.prisma.choidolsangInquiry.findMany({
@@ -386,53 +373,6 @@ export class ChoidolsangInquiriesService {
         throw recordNotFound();
       }
     });
-  }
-
-  /** 기록 하나를 완전히 지운다. 문의에는 기록이 하나 이상 남아야 한다. */
-  removeRecord(rawCode: string, recordId: string): Promise<InquiryDetail> {
-    return this.changeRecords(rawCode, async (tx, inquiryId) => {
-      const remaining = await tx.choidolsangInquiryRecord.count({ where: { inquiryId } });
-      const { count } = await tx.choidolsangInquiryRecord.deleteMany({
-        where: { id: recordId, inquiryId },
-      });
-
-      if (count === 0) {
-        throw recordNotFound();
-      }
-
-      if (remaining <= 1) {
-        throw new ConflictException('An inquiry must keep at least one record');
-      }
-    });
-  }
-
-  /**
-   * 문의를 숨김 삭제한다. 행은 남기고 deletedAt만 기록한다.
-   * 예약으로 이어진 문의는 예약이 문의를 가리키므로 지울 수 없다(409).
-   */
-  async remove(rawCode: string): Promise<void> {
-    const code = normalizeInquiryCode(rawCode);
-
-    if (!code) {
-      throw inquiryNotFound();
-    }
-
-    const { count } = await this.prisma.choidolsangInquiry.updateMany({
-      data: { deletedAt: new Date() },
-      where: { code, ...NOT_DELETED, reservation: { is: null } },
-    });
-
-    if (count > 0) {
-      return;
-    }
-
-    const inquiry = await this.findActive(code);
-
-    if (!inquiry) {
-      throw inquiryNotFound();
-    }
-
-    throw new ConflictException('Inquiry has a reservation');
   }
 
   /** 대기 중인 문의를 거절한다. 거절 사유는 필수. */

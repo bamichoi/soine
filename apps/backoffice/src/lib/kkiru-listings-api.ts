@@ -1,5 +1,6 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
 import type { KkiruListingStatus } from '@/lib/kkiru-status';
+import { type ListQuery, withListParams } from '@/lib/list-query';
 
 export type KkiruListing = {
   id: string;
@@ -51,32 +52,13 @@ export type KkiruListingInput = Omit<
 const PATH = 'kkiru/listings';
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-export async function listKkiruListings(
-  page: number,
-  q: string,
-  status: KkiruListingStatus | null,
-): Promise<KkiruListingListResponse> {
-  const params = new URLSearchParams();
-
-  if (q) {
-    params.set('q', q);
-  }
-
-  if (status) {
-    params.set('status', status);
-  }
-
-  if (page > 1) {
-    params.set('page', String(page));
-  }
-
-  const query = params.toString();
-  const response = await requestAdminApi(query ? `${PATH}?${query}` : PATH);
+export async function listKkiruListings(query: ListQuery): Promise<KkiruListingListResponse> {
+  const response = await requestAdminApi(withListParams(PATH, query));
 
   return (await response.json()) as KkiruListingListResponse;
 }
 
-/** 고를 수 있는(계약가능) 매물을 번호·이름·주소로 찾는다. */
+/** 고를 수 있는(계약완료가 아닌) 매물을 번호·이름·주소로 찾는다. */
 export async function searchKkiruListingOptions(q: string): Promise<KkiruListingOption[]> {
   const response = await requestAdminApi(`${PATH}/options?${new URLSearchParams({ q })}`);
 

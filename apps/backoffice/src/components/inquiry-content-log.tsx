@@ -5,7 +5,6 @@ import { Icon } from '@/components/icon';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   addInquiryRecord,
-  deleteInquiryRecord,
   formatInquiryDate,
   getSeoulToday,
   INQUIRY_CONTENT_MAX_LENGTH,
@@ -29,11 +28,7 @@ const TEXT_BUTTON_CLASS_NAME =
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof AdminApiError && error.status === 404) {
-    return '삭제되었거나 없는 기록입니다. 화면을 새로고침해 주세요.';
-  }
-
-  if (error instanceof AdminApiError && error.status === 409) {
-    return '문의에는 기록이 하나 이상 있어야 합니다.';
+    return '없는 기록입니다. 화면을 새로고침해 주세요.';
   }
 
   return fallback;
@@ -142,39 +137,23 @@ function RecordForm({ label, initial, submitLabel, onSubmit, onCancel }: RecordF
 type LogEntryProps = {
   code: string;
   record: InquiryRecord;
-  canDelete: boolean;
   onChange: (inquiry: InquiryDetail) => void;
 };
 
-function LogEntry({ code, record, canDelete, onChange }: LogEntryProps) {
-  const [mode, setMode] = useState<'view' | 'edit' | 'confirm-delete'>('view');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
+// 기록은 고칠 수만 있고 지우지 않는다.
+function LogEntry({ code, record, onChange }: LogEntryProps) {
+  const [isEditing, setIsEditing] = useState(false);
 
-  async function handleDelete() {
-    setErrorMessage('');
-    setIsDeleting(true);
-
-    try {
-      onChange(await deleteInquiryRecord(code, record.id));
-    } catch (error) {
-      setErrorMessage(
-        getErrorMessage(error, '기록을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.'),
-      );
-      setIsDeleting(false);
-    }
-  }
-
-  if (mode === 'edit') {
+  if (isEditing) {
     return (
       <li className="py-4 first:pt-0 last:pb-0">
         <RecordForm
           initial={{ content: record.content, recordedOn: record.recordedOn }}
           label="기록 수정"
-          onCancel={() => setMode('view')}
+          onCancel={() => setIsEditing(false)}
           onSubmit={async (input) => {
             const updated = await updateInquiryRecord(code, record.id, input);
-            setMode('view');
+            setIsEditing(false);
             onChange(updated);
           }}
           submitLabel="저장"
@@ -188,48 +167,10 @@ function LogEntry({ code, record, canDelete, onChange }: LogEntryProps) {
       <p className="text-[15px] leading-7 break-words whitespace-pre-wrap">{record.content}</p>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-[var(--muted)]">- {formatInquiryDate(record.recordedOn)}</p>
-        {mode === 'confirm-delete' ? (
-          <div className="flex items-center gap-2 text-xs">
-            <span>이 기록을 삭제할까요?</span>
-            <button
-              className={TEXT_BUTTON_CLASS_NAME}
-              disabled={isDeleting}
-              onClick={() => setMode('view')}
-              type="button"
-            >
-              취소
-            </button>
-            <button
-              className="text-xs font-medium text-[var(--error)] hover:underline disabled:opacity-60"
-              disabled={isDeleting}
-              onClick={handleDelete}
-              type="button"
-            >
-              {isDeleting ? '삭제 중...' : '삭제'}
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <button
-              className={TEXT_BUTTON_CLASS_NAME}
-              onClick={() => setMode('edit')}
-              type="button"
-            >
-              수정
-            </button>
-            {canDelete ? (
-              <button
-                className={TEXT_BUTTON_CLASS_NAME}
-                onClick={() => setMode('confirm-delete')}
-                type="button"
-              >
-                삭제
-              </button>
-            ) : null}
-          </div>
-        )}
+        <button className={TEXT_BUTTON_CLASS_NAME} onClick={() => setIsEditing(true)} type="button">
+          수정
+        </button>
       </div>
-      <ErrorMessage message={errorMessage} />
     </li>
   );
 }
@@ -242,8 +183,6 @@ type InquiryContentLogProps = {
 // 문의 내용을 기록 날짜와 함께 로그처럼 쌓아 보여 준다. 첫 기록이 첫 문의다.
 export function InquiryContentLog({ inquiry, onChange }: InquiryContentLogProps) {
   const [isAdding, setIsAdding] = useState(false);
-  // 문의에는 기록이 하나 이상 있어야 하므로 하나만 남으면 삭제를 숨긴다.
-  const canDelete = inquiry.records.length > 1;
 
   return (
     <section
@@ -266,13 +205,7 @@ export function InquiryContentLog({ inquiry, onChange }: InquiryContentLogProps)
 
       <ol className="flex flex-col divide-y divide-[var(--line)]">
         {inquiry.records.map((record) => (
-          <LogEntry
-            canDelete={canDelete}
-            code={inquiry.code}
-            key={record.id}
-            onChange={onChange}
-            record={record}
-          />
+          <LogEntry code={inquiry.code} key={record.id} onChange={onChange} record={record} />
         ))}
       </ol>
 

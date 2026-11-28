@@ -75,7 +75,6 @@ export const INQUIRY_SEARCH_FIELDS = [
   'content',
   'location',
   'desiredConcept',
-  'status',
 ] as const;
 export type InquirySearchField = (typeof INQUIRY_SEARCH_FIELDS)[number];
 
@@ -85,7 +84,6 @@ export const INQUIRY_SEARCH_FIELD_LABELS: Record<InquirySearchField, string> = {
   content: '문의 내용',
   desiredConcept: '희망 돌상 컨셉',
   location: '장소',
-  status: '상태',
 };
 
 export const INQUIRY_SORT_FIELDS = [
@@ -104,6 +102,8 @@ export type InquiryListQuery = {
   q: string;
   sort: InquirySortField;
   order: SortOrder;
+  /** 상태 필터. 빈 값이면 모든 상태 */
+  status: InquiryStatus | '';
 };
 
 export const DEFAULT_INQUIRY_LIST_QUERY: InquiryListQuery = {
@@ -112,6 +112,7 @@ export const DEFAULT_INQUIRY_LIST_QUERY: InquiryListQuery = {
   page: 1,
   q: '',
   sort: 'inquiredOn',
+  status: '',
 };
 
 function isOneOf<T extends string>(values: readonly T[], value: string | null): value is T {
@@ -124,6 +125,7 @@ export function parseInquiryListQuery(params: URLSearchParams): InquiryListQuery
   const field = params.get('field');
   const sort = params.get('sort');
   const order = params.get('order');
+  const status = params.get('status');
 
   return {
     field: isOneOf(INQUIRY_SEARCH_FIELDS, field) ? field : DEFAULT_INQUIRY_LIST_QUERY.field,
@@ -131,6 +133,7 @@ export function parseInquiryListQuery(params: URLSearchParams): InquiryListQuery
     page: Number.isInteger(page) && page >= 1 ? page : DEFAULT_INQUIRY_LIST_QUERY.page,
     q: params.get('q')?.slice(0, 100) ?? '',
     sort: isOneOf(INQUIRY_SORT_FIELDS, sort) ? sort : DEFAULT_INQUIRY_LIST_QUERY.sort,
+    status: isOneOf(INQUIRY_STATUSES, status) ? status : DEFAULT_INQUIRY_LIST_QUERY.status,
   };
 }
 
@@ -138,7 +141,7 @@ export function parseInquiryListQuery(params: URLSearchParams): InquiryListQuery
 export function toInquiryListSearchParams(query: InquiryListQuery): URLSearchParams {
   const params = new URLSearchParams();
 
-  for (const key of ['page', 'field', 'q', 'sort', 'order'] as const) {
+  for (const key of ['page', 'field', 'q', 'status', 'sort', 'order'] as const) {
     if (query[key] !== DEFAULT_INQUIRY_LIST_QUERY[key] && query[key] !== '') {
       params.set(key, String(query[key]));
     }
@@ -266,13 +269,6 @@ export async function updateInquiry(
   return (await response.json()) as InquiryDetail;
 }
 
-/** 문의를 숨김 삭제한다. 목록과 상세에서 더는 보이지 않는다. */
-export async function deleteInquiry(code: string): Promise<void> {
-  await requestAdminApi(`choidolsang/inquiries/${encodeURIComponent(code)}`, {
-    method: 'DELETE',
-  });
-}
-
 /** ISO 일시 → 한국 시간 날짜(YYYY-MM-DD)와 시각(HH:mm). 수정 폼 입력값에 쓴다. */
 export function toSeoulDateAndTime(isoDateTime: string): { date: string; time: string } {
   const parts = Object.fromEntries(
@@ -324,13 +320,6 @@ export async function updateInquiryRecord(
     headers: { 'Content-Type': 'application/json' },
     method: 'PATCH',
   });
-
-  return (await response.json()) as InquiryDetail;
-}
-
-/** 로그의 기록 하나를 완전히 지운다. 마지막 남은 기록은 지울 수 없다(409). */
-export async function deleteInquiryRecord(code: string, recordId: string): Promise<InquiryDetail> {
-  const response = await requestAdminApi(recordPath(code, recordId), { method: 'DELETE' });
 
   return (await response.json()) as InquiryDetail;
 }

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
-import { ChoidolsangReservationsService } from './reservations.service';
+import { buildReservationWhere, ChoidolsangReservationsService } from './reservations.service';
 
 const CONCEPT = {
   components: [],
@@ -322,5 +322,31 @@ describe('ChoidolsangReservationsService update', () => {
     mock.reservation.findUnique.mockResolvedValue(null);
 
     await expect(mock.service.update('ZZZZZZZZ', FIELDS)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('buildReservationWhere', () => {
+  it('searches only the chosen field', () => {
+    expect(buildReservationWhere('babyName', '하준')).toEqual({
+      babyName: { contains: '하준', mode: 'insensitive' },
+    });
+    expect(buildReservationWhere('customerPhone', '010-1234')).toEqual({
+      customerPhone: { contains: '0101234' },
+    });
+  });
+
+  it('returns nothing when the query cannot match the chosen field', () => {
+    expect(buildReservationWhere('customerPhone', '김')).toEqual({ id: { in: [] } });
+  });
+
+  it('searches every usable field for all', () => {
+    const where = buildReservationWhere('all', '한복');
+
+    expect(where.OR).toContainEqual({
+      concept: { name: { contains: '한복', mode: 'insensitive' } },
+    });
+    expect(where.OR).not.toContainEqual(
+      expect.objectContaining({ customerPhone: expect.anything() }),
+    );
   });
 });

@@ -13,7 +13,7 @@ import {
   lookupKkiruCustomer,
   updateKkiruCustomer,
 } from '@/lib/kkiru-customers-api';
-import { formatPhone, isValidPhone } from '@/lib/phone';
+import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 
 const LIST_PATH = '/kkiru/customers';
 
@@ -25,7 +25,7 @@ function validateCustomer(name: string, phone: string): string | null {
     return '이름을 입력해 주세요.';
   }
 
-  return isValidPhone(phone) ? null : '연락처를 바르게 입력해 주세요. (예: 010-1234-5678)';
+  return isValidMobilePhone(phone) ? null : '연락처를 010-0000-0000 형식으로 입력해 주세요.';
 }
 
 type KkiruCustomerFormProps = {
@@ -38,6 +38,7 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
   const idPrefix = useId();
   const [name, setName] = useState(customer?.name ?? '');
   const [phone, setPhone] = useState(customer ? formatPhone(customer.phone) : '');
+  const [memo, setMemo] = useState(customer?.memo ?? '');
   const [errorMessage, setErrorMessage] = useState('');
   const [existing, setExisting] = useState<KkiruCustomerSummary | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,7 +55,7 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
       return;
     }
 
-    const input = { name: name.trim(), phone: phone.replace(/\D/g, '') };
+    const input = { memo: memo.trim() || null, name: name.trim(), phone: phone.replace(/\D/g, '') };
     setErrorMessage('');
     setIsSubmitting(true);
 
@@ -82,7 +83,7 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
 
   return (
     <form
-      aria-label={customer ? '고객 수정' : '고객 추가'}
+      aria-label={customer ? '고객 수정' : '새 고객'}
       className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
       onSubmit={handleSubmit}
     >
@@ -109,6 +110,15 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
             required
             type="tel"
             value={phone}
+          />
+        </FormField>
+        <FormField htmlFor={`${idPrefix}-memo`} label="고객 메모">
+          <textarea
+            className="min-h-28 w-full resize-y border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-[var(--brand)] disabled:opacity-60"
+            id={`${idPrefix}-memo`}
+            maxLength={5000}
+            onChange={(event) => setMemo(event.target.value)}
+            value={memo}
           />
         </FormField>
       </fieldset>

@@ -35,10 +35,30 @@ export type ConceptListResponse = {
   };
 };
 
+export const CONCEPT_SEARCH_FIELDS = ['all', 'name', 'components'] as const;
+export type ConceptSearchField = (typeof CONCEPT_SEARCH_FIELDS)[number];
+export const CONCEPT_SEARCH_FIELD_LABELS: Record<ConceptSearchField, string> = {
+  all: '전체 항목',
+  components: '구성품',
+  name: '컨셉 이름',
+};
+export const CONCEPT_SORT_FIELDS = ['name', 'price', 'createdAt'] as const;
+export type ConceptSortField = (typeof CONCEPT_SORT_FIELDS)[number];
+
 export type ConceptListQuery = {
   page: number;
   q: string;
+  field: ConceptSearchField;
+  sort: ConceptSortField;
+  order: 'asc' | 'desc';
 };
+
+/** 기본: 최근 등록순 */
+const DEFAULT_SORT: Pick<ConceptListQuery, 'sort' | 'order'> = { order: 'desc', sort: 'createdAt' };
+
+function isOneOf<T extends string>(values: readonly T[], value: string | null): value is T {
+  return value !== null && (values as readonly string[]).includes(value);
+}
 
 export type ConceptInput = {
   name: string;
@@ -48,10 +68,17 @@ export type ConceptInput = {
 
 export function parseConceptListQuery(params: URLSearchParams): ConceptListQuery {
   const page = Number.parseInt(params.get('page') ?? '', 10);
+  const field = params.get('field');
+  const sort = params.get('sort');
+  const order = params.get('order');
+  const hasSort = isOneOf(CONCEPT_SORT_FIELDS, sort) && (order === 'asc' || order === 'desc');
 
   return {
+    field: isOneOf(CONCEPT_SEARCH_FIELDS, field) ? field : 'all',
+    order: hasSort ? (order as 'asc' | 'desc') : DEFAULT_SORT.order,
     page: Number.isInteger(page) && page > 0 ? page : 1,
     q: (params.get('q') ?? '').trim().slice(0, 100),
+    sort: hasSort ? (sort as ConceptSortField) : DEFAULT_SORT.sort,
   };
 }
 
@@ -61,6 +88,15 @@ export function toConceptListSearchParams(query: ConceptListQuery): URLSearchPar
 
   if (query.q) {
     params.set('q', query.q);
+
+    if (query.field !== 'all') {
+      params.set('field', query.field);
+    }
+  }
+
+  if (query.sort !== DEFAULT_SORT.sort || query.order !== DEFAULT_SORT.order) {
+    params.set('sort', query.sort);
+    params.set('order', query.order);
   }
 
   if (query.page > 1) {

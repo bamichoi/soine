@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { CopyCodeButton } from '@/components/copy-code-button';
 import { Icon } from '@/components/icon';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
 import { Pagination } from '@/components/pagination';
@@ -12,10 +13,13 @@ import {
   getFirstLine,
   INQUIRY_SEARCH_FIELD_LABELS,
   INQUIRY_SEARCH_FIELDS,
+  INQUIRY_STATUS_LABELS,
+  INQUIRY_STATUSES,
   type InquiryListQuery,
   type InquiryListResponse,
   type InquirySearchField,
   type InquirySortField,
+  type InquiryStatus,
   listInquiries,
   parseInquiryListQuery,
   toInquiryListSearchParams,
@@ -46,7 +50,7 @@ type Column = {
 
 const COLUMNS: Column[] = [
   // 문의 번호는 순서가 없는 무작위 코드라 정렬하지 않는다.
-  { className: 'w-28', key: 'code', label: '문의 번호' },
+  { className: 'w-36', key: 'code', label: '문의 번호' },
   { className: 'w-28', key: 'inquiredOn', label: '문의 날짜', sortField: 'inquiredOn' },
   { key: 'content', label: '문의 내용' },
   {
@@ -100,6 +104,36 @@ function ColumnHeader({ column, order, onSort }: ColumnHeaderProps) {
         column.label
       )}
     </th>
+  );
+}
+
+function StatusFilter({
+  value,
+  onChange,
+}: {
+  value: InquiryStatus | '';
+  onChange: (status: InquiryStatus | '') => void;
+}) {
+  return (
+    <div className="relative">
+      <select
+        aria-label="상태 필터"
+        className={`${CONTROL_CLASS_NAME} w-32 appearance-none pr-9`}
+        onChange={(event) => onChange(event.target.value as InquiryStatus | '')}
+        value={value}
+      >
+        <option value="">전체 상태</option>
+        {INQUIRY_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {INQUIRY_STATUS_LABELS[status]}
+          </option>
+        ))}
+      </select>
+      <Icon
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+        name="chevron-down"
+      />
+    </div>
   );
 }
 
@@ -193,51 +227,60 @@ export function ChoidolsangInquiryTable() {
         </Link>
       </div>
 
-      <form
-        aria-label="문의 검색"
-        className="flex flex-wrap items-center gap-2"
-        onSubmit={handleSearch}
-      >
-        <div className="relative">
-          <select
-            aria-label="검색 항목"
-            className={`${CONTROL_CLASS_NAME} w-40 appearance-none pr-9`}
-            onChange={(event) => setSearchField(event.target.value as InquirySearchField)}
-            value={searchField}
-          >
-            {INQUIRY_SEARCH_FIELDS.map((field) => (
-              <option key={field} value={field}>
-                {INQUIRY_SEARCH_FIELD_LABELS[field]}
-              </option>
-            ))}
-          </select>
-          <Icon
-            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-            name="chevron-down"
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <form
+          aria-label="문의 검색"
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+          onSubmit={handleSearch}
+        >
+          <div className="relative">
+            <select
+              aria-label="검색 항목"
+              className={`${CONTROL_CLASS_NAME} w-40 appearance-none pr-9`}
+              onChange={(event) => setSearchField(event.target.value as InquirySearchField)}
+              value={searchField}
+            >
+              {INQUIRY_SEARCH_FIELDS.map((field) => (
+                <option key={field} value={field}>
+                  {INQUIRY_SEARCH_FIELD_LABELS[field]}
+                </option>
+              ))}
+            </select>
+            <Icon
+              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+              name="chevron-down"
+            />
+          </div>
+          <input
+            aria-label="검색어"
+            className={`${CONTROL_CLASS_NAME} min-w-0 flex-1 sm:max-w-80`}
+            maxLength={100}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="검색어 입력"
+            type="search"
+            value={searchText}
+          />
+          <button className={BUTTON_CLASS_NAME} type="submit">
+            검색
+          </button>
+          {query.q || query.status ? (
+            <button
+              className="h-10 px-2 text-sm text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
+              onClick={() => updateQuery({ field: 'all', page: 1, q: '', status: '' })}
+              type="button"
+            >
+              검색 초기화
+            </button>
+          ) : null}
+        </form>
+        {/* 상태 열이 표 오른쪽 끝에 있으므로 상태 필터도 오른쪽 끝에 둔다. */}
+        <div className="ml-auto">
+          <StatusFilter
+            onChange={(status) => updateQuery({ page: 1, status })}
+            value={query.status}
           />
         </div>
-        <input
-          aria-label="검색어"
-          className={`${CONTROL_CLASS_NAME} min-w-0 flex-1 sm:max-w-80`}
-          maxLength={100}
-          onChange={(event) => setSearchText(event.target.value)}
-          placeholder="검색어 입력"
-          type="search"
-          value={searchText}
-        />
-        <button className={BUTTON_CLASS_NAME} type="submit">
-          검색
-        </button>
-        {query.q ? (
-          <button
-            className="h-10 px-2 text-sm text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
-            onClick={() => updateQuery({ field: 'all', page: 1, q: '' })}
-            type="button"
-          >
-            검색 초기화
-          </button>
-        ) : null}
-      </form>
+      </div>
 
       <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full min-w-[56rem] table-fixed text-left text-sm">
@@ -263,13 +306,16 @@ export function ChoidolsangInquiryTable() {
                     key={inquiry.id}
                   >
                     <td className="px-4 py-3">
-                      <Link
-                        aria-label={`문의 ${inquiry.code} 상세 보기`}
-                        className="font-mono text-[13px] tracking-wide outline-none after:absolute after:inset-0"
-                        href={`/choidolsang/inquiries/${inquiry.code}${detailQuery}`}
-                      >
-                        {inquiry.code}
-                      </Link>
+                      <span className="flex items-center gap-1">
+                        <Link
+                          aria-label={`문의 ${inquiry.code} 상세 보기`}
+                          className="font-mono text-[13px] tracking-wide outline-none after:absolute after:inset-0"
+                          href={`/choidolsang/inquiries/${inquiry.code}${detailQuery}`}
+                        >
+                          {inquiry.code}
+                        </Link>
+                        <CopyCodeButton code={inquiry.code} label="문의 번호" />
+                      </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap tabular-nums">
                       {formatInquiryDate(inquiry.inquiredOn)}
@@ -333,7 +379,7 @@ export function ChoidolsangInquiryTable() {
         ) : null}
         {state.kind === 'loaded' && state.data.items.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-            {query.q ? '검색 결과가 없습니다.' : '아직 등록된 문의가 없습니다.'}
+            {query.q || query.status ? '검색 결과가 없습니다.' : '아직 등록된 문의가 없습니다.'}
           </p>
         ) : null}
       </div>

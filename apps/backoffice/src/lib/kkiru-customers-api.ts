@@ -1,5 +1,6 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
 import type { KkiruConsultationStatus } from '@/lib/kkiru-status';
+import { type ListQuery, withListParams } from '@/lib/list-query';
 
 export type KkiruCustomerSummary = {
   id: string;
@@ -13,6 +14,7 @@ export type KkiruCustomerSummary = {
 };
 
 export type KkiruCustomerDetail = Omit<KkiruCustomerSummary, 'consultationCount'> & {
+  memo: string | null;
   consultations: {
     code: string;
     title: string;
@@ -27,27 +29,13 @@ export type KkiruCustomerListResponse = {
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
 
-export type KkiruCustomerInput = { name: string; phone: string };
+export type KkiruCustomerInput = { name: string; phone: string; memo?: string | null };
 
 const PATH = 'kkiru/customers';
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-export async function listKkiruCustomers(
-  page: number,
-  q: string,
-): Promise<KkiruCustomerListResponse> {
-  const params = new URLSearchParams();
-
-  if (q) {
-    params.set('q', q);
-  }
-
-  if (page > 1) {
-    params.set('page', String(page));
-  }
-
-  const query = params.toString();
-  const response = await requestAdminApi(query ? `${PATH}?${query}` : PATH);
+export async function listKkiruCustomers(query: ListQuery): Promise<KkiruCustomerListResponse> {
+  const response = await requestAdminApi(withListParams(PATH, query));
 
   return (await response.json()) as KkiruCustomerListResponse;
 }

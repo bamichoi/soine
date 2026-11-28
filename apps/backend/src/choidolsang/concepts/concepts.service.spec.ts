@@ -25,6 +25,7 @@ describe('ChoidolsangConceptsService', () => {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
     };
     const prisma = {
+      $queryRaw: jest.fn(() => Promise.resolve([{ id: CONCEPT.id }])),
       $transaction: jest.fn(() => Promise.resolve([21, [CONCEPT]])),
       choidolsangConcept: concept,
     } as unknown as PrismaService;
@@ -50,11 +51,35 @@ describe('ChoidolsangConceptsService', () => {
   });
 
   it('searches by name case-insensitively', async () => {
-    await service.list({ q: '한복' });
+    await service.list({ field: 'name', q: '한복' });
 
     expect(concept.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { deletedAt: null, name: { contains: '한복', mode: 'insensitive' } },
+      }),
+    );
+  });
+
+  it('searches name or components for all fields', async () => {
+    await service.list({ q: '떡' });
+
+    expect(concept.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deletedAt: null,
+          // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
+          OR: [{ name: { contains: '떡', mode: 'insensitive' } }, { id: { in: [CONCEPT.id] } }],
+        },
+      }),
+    );
+  });
+
+  it('sorts by the chosen column, breaking ties by newest', async () => {
+    await service.list({ order: 'asc', sort: 'price' });
+
+    expect(concept.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ price: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
   });

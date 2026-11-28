@@ -8,7 +8,6 @@ export const INQUIRY_SEARCH_FIELDS = [
   'content',
   'location',
   'desiredConcept',
-  'status',
 ] as const;
 export type InquirySearchField = (typeof INQUIRY_SEARCH_FIELDS)[number];
 
@@ -20,6 +19,10 @@ export const INQUIRY_SORT_FIELDS = [
   'status',
 ] as const;
 export type InquirySortField = (typeof INQUIRY_SORT_FIELDS)[number];
+
+/** 상태 필터. 검색어와 따로 고른다. */
+export const INQUIRY_FILTER_STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled'] as const;
+export type InquiryFilterStatus = (typeof INQUIRY_FILTER_STATUSES)[number];
 
 export const SORT_ORDERS = ['asc', 'desc'] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
@@ -41,6 +44,10 @@ export class ListInquiriesQueryDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(100)
   q?: string;
+
+  @IsOptional()
+  @IsIn(INQUIRY_FILTER_STATUSES)
+  status?: InquiryFilterStatus;
 
   @IsOptional()
   @IsIn(INQUIRY_SORT_FIELDS)

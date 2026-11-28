@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import { CopyCodeButton } from '@/components/copy-code-button';
 import { InquiryContentLog } from '@/components/inquiry-content-log';
-import { InquiryDeleteDialog } from '@/components/inquiry-delete-dialog';
 import { InquiryRejectDialog } from '@/components/inquiry-reject-dialog';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
 import { AdminApiError } from '@/lib/admin-auth-api';
@@ -68,9 +68,10 @@ function InquiryBody({ inquiry, onChange }: InquiryActionsProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-3">
-        <p className="flex items-baseline gap-2 text-sm">
+        <p className="flex items-center gap-2 text-sm">
           <span className="text-[var(--muted)]">문의 번호</span>
           <span className="font-mono tracking-wide">{inquiry.code}</span>
+          <CopyCodeButton code={inquiry.code} label="문의 번호" />
         </p>
         <InquiryStatusBadge status={inquiry.status} />
       </header>
@@ -214,41 +215,21 @@ function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
 
 // 왼쪽: [수정] [삭제] / 오른쪽: 상태별 버튼
 function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const listQuery = searchParams.toString();
   const querySuffix = listQuery ? `?${listQuery}` : '';
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
+  // 문의는 삭제하지 않는다. 수정과 상태별 버튼만 둔다.
   return (
     <footer className="flex flex-wrap items-start justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
-      <div className="flex gap-2">
-        <Link
-          className={`${SECONDARY_BUTTON_CLASS_NAME} flex items-center`}
-          href={`${LIST_PATH}/${inquiry.code}/edit${querySuffix}`}
-        >
-          수정
-        </Link>
-        {/* 예약으로 이어진 문의는 예약이 가리키고 있어 지울 수 없다. */}
-        <button
-          className={SECONDARY_BUTTON_CLASS_NAME}
-          disabled={inquiry.reservationCode !== null}
-          onClick={() => setIsDeleteOpen(true)}
-          title={inquiry.reservationCode ? '예약으로 이어진 문의는 삭제할 수 없습니다.' : undefined}
-          type="button"
-        >
-          삭제
-        </button>
-      </div>
+      <Link
+        className={`${SECONDARY_BUTTON_CLASS_NAME} flex items-center`}
+        href={`${LIST_PATH}/${inquiry.code}/edit${querySuffix}`}
+      >
+        수정
+      </Link>
 
       <StatusActions inquiry={inquiry} onChange={onChange} />
-
-      <InquiryDeleteDialog
-        code={inquiry.code}
-        isOpen={isDeleteOpen}
-        onClose={() => setIsDeleteOpen(false)}
-        onDeleted={() => router.push(`${LIST_PATH}${querySuffix}`)}
-      />
     </footer>
   );
 }

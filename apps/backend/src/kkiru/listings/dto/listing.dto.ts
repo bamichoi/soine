@@ -1,12 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
-import {
-  ManwonField,
-  OptionalText,
-  PageQueryDto,
-  PhoneField,
-  RequiredText,
-} from '../../common/kkiru-fields';
+import { ManwonField, OptionalText, PhoneField, RequiredText } from '../../common/kkiru-fields';
+import { ListQueryDto } from '../../common/list-query';
 
 /** 매물 추가·수정. 상태는 계약에 따라 바뀌므로 여기서 받지 않는다. */
 export class ListingDto {
@@ -57,12 +52,34 @@ export class ListingDto {
   clientPhone!: string;
 }
 
-export const LISTING_STATUSES = ['available', 'contracted'] as const;
+export const LISTING_STATUSES = ['available', 'meeting', 'contracting', 'contracted'] as const;
 
-export class ListListingsQueryDto extends PageQueryDto {
+export const LISTING_SEARCH_FIELDS = ['all', 'code', 'name', 'address', 'client'] as const;
+export type ListingSearchField = (typeof LISTING_SEARCH_FIELDS)[number];
+export const LISTING_SORT_FIELDS = [
+  'name',
+  'address',
+  'areaM2',
+  'floor',
+  'deposit',
+  'premium',
+  'status',
+  'createdAt',
+] as const;
+export type ListingSortField = (typeof LISTING_SORT_FIELDS)[number];
+
+export class ListListingsQueryDto extends ListQueryDto {
   @IsOptional()
   @IsIn(LISTING_STATUSES)
   status?: (typeof LISTING_STATUSES)[number];
+
+  @IsOptional()
+  @IsIn(LISTING_SEARCH_FIELDS)
+  field?: ListingSearchField;
+
+  @IsOptional()
+  @IsIn(LISTING_SORT_FIELDS)
+  sort?: ListingSortField;
 }
 
 /** 매물 고르기(상담매물·미팅 대상)용 검색 */

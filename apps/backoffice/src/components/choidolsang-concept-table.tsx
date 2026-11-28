@@ -5,14 +5,20 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { Pagination } from '@/components/pagination';
+import { SortableHeader } from '@/components/sortable-header';
 import {
+  CONCEPT_SEARCH_FIELD_LABELS,
+  CONCEPT_SEARCH_FIELDS,
   type ConceptListQuery,
   type ConceptListResponse,
+  type ConceptSearchField,
+  type ConceptSortField,
   formatPrice,
   listConcepts,
   parseConceptListQuery,
   toConceptListSearchParams,
 } from '@/lib/choidolsang-concepts-api';
+import { nextSortOrder } from '@/lib/sort-order';
 
 const LIST_PATH = '/choidolsang/concepts';
 
@@ -38,13 +44,15 @@ export function ChoidolsangConceptTable() {
   );
   const queryKey = toConceptListSearchParams(query).toString();
   const [searchText, setSearchText] = useState(query.q);
+  const [searchField, setSearchField] = useState<ConceptSearchField>(query.field);
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
 
   // 뒤로 가기 등으로 URL이 바뀌면 검색창도 맞춘다.
   useEffect(() => {
     setSearchText(query.q);
-  }, [query.q]);
+    setSearchField(query.field);
+  }, [query.q, query.field]);
 
   useEffect(() => {
     let isActive = true;
@@ -77,8 +85,15 @@ export function ChoidolsangConceptTable() {
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateQuery({ page: 1, q: searchText.trim() });
+    updateQuery({ field: searchField, page: 1, q: searchText.trim() });
   }
+
+  // 처음 누르면 이름은 가나다순, 가격은 높은 순으로 정렬한다.
+  function handleSort(sort: ConceptSortField, firstOrder: 'asc' | 'desc') {
+    updateQuery({ order: nextSortOrder(query, sort, firstOrder), page: 1, sort });
+  }
+
+  const orderOf = (sort: ConceptSortField) => (query.sort === sort ? query.order : null);
 
   const pagination = state.kind === 'loaded' ? state.data.pagination : null;
   const detailQuery = queryKey ? `?${queryKey}` : '';
@@ -106,12 +121,30 @@ export function ChoidolsangConceptTable() {
         className="flex flex-wrap items-center gap-2"
         onSubmit={handleSearch}
       >
+        <div className="relative">
+          <select
+            aria-label="검색 항목"
+            className={`${CONTROL_CLASS_NAME} w-36 appearance-none pr-9`}
+            onChange={(event) => setSearchField(event.target.value as ConceptSearchField)}
+            value={searchField}
+          >
+            {CONCEPT_SEARCH_FIELDS.map((field) => (
+              <option key={field} value={field}>
+                {CONCEPT_SEARCH_FIELD_LABELS[field]}
+              </option>
+            ))}
+          </select>
+          <Icon
+            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+            name="chevron-down"
+          />
+        </div>
         <input
-          aria-label="컨셉 이름"
+          aria-label="검색어"
           className={`${CONTROL_CLASS_NAME} min-w-0 flex-1 sm:max-w-80`}
           maxLength={100}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="컨셉 이름으로 검색"
+          placeholder="검색어 입력"
           type="search"
           value={searchText}
         />
@@ -121,7 +154,7 @@ export function ChoidolsangConceptTable() {
         {query.q ? (
           <button
             className="h-10 px-2 text-sm text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
-            onClick={() => updateQuery({ page: 1, q: '' })}
+            onClick={() => updateQuery({ field: 'all', page: 1, q: '' })}
             type="button"
           >
             검색 초기화
@@ -133,15 +166,22 @@ export function ChoidolsangConceptTable() {
         <table className="w-full min-w-[40rem] table-fixed text-left text-sm">
           <thead className="border-b border-[var(--line)] bg-[var(--background)] text-[var(--muted)]">
             <tr>
-              <th className="w-56 px-4 py-3 font-medium" scope="col">
-                이름
-              </th>
+              <SortableHeader
+                className="w-56"
+                label="이름"
+                onSort={() => handleSort('name', 'asc')}
+                order={orderOf('name')}
+              />
               <th className="px-4 py-3 font-medium" scope="col">
                 구성품
               </th>
-              <th className="w-36 px-4 py-3 text-right font-medium" scope="col">
-                가격
-              </th>
+              <SortableHeader
+                align="right"
+                className="w-36"
+                label="가격"
+                onSort={() => handleSort('price', 'desc')}
+                order={orderOf('price')}
+              />
             </tr>
           </thead>
           <tbody>

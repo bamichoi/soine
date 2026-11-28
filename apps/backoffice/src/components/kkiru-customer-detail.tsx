@@ -5,10 +5,10 @@ import { CopyCodeButton } from '@/components/copy-code-button';
 import { Icon } from '@/components/icon';
 import { KkiruCustomerLoader } from '@/components/kkiru-customer-form';
 import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
+import { PhoneNumber } from '@/components/phone-number';
 import { formatInquiryDate } from '@/lib/choidolsang-inquiries-api';
 import type { KkiruCustomerDetail } from '@/lib/kkiru-customers-api';
 import { CONSULTATION_STATUS_LABELS } from '@/lib/kkiru-status';
-import { formatPhone } from '@/lib/phone';
 
 const SECONDARY_BUTTON_CLASS_NAME =
   'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
@@ -30,9 +30,21 @@ function CustomerBody({ customer }: { customer: KkiruCustomerDetail }) {
           </div>
           <div className="flex flex-col gap-1">
             <dt className="text-xs text-[var(--muted)]">연락처</dt>
-            <dd className="text-sm tabular-nums">{formatPhone(customer.phone)}</dd>
+            <dd className="text-sm">
+              <PhoneNumber phone={customer.phone} />
+            </dd>
           </div>
         </dl>
+
+        {customer.memo ? (
+          <section
+            aria-label="고객 메모"
+            className="flex flex-col gap-2 bg-[var(--background)] px-5 py-4"
+          >
+            <h3 className="text-xs text-[var(--muted)]">고객 메모</h3>
+            <p className="text-sm leading-6 break-words whitespace-pre-wrap">{customer.memo}</p>
+          </section>
+        ) : null}
 
         <section aria-label="상담" className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
@@ -41,8 +53,7 @@ function CustomerBody({ customer }: { customer: KkiruCustomerDetail }) {
               className="inline-flex h-8 items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]"
               href={`/kkiru/consultations/new?customer=${customer.code}`}
             >
-              <Icon className="size-3.5" name="plus" />
-              상담 추가
+              <Icon className="size-3.5" name="plus" />새 상담
             </Link>
           </div>
           {customer.consultations.length > 0 ? (

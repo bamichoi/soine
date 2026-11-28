@@ -21,7 +21,7 @@ import {
   type KkiruListingInput,
   updateKkiruListing,
 } from '@/lib/kkiru-listings-api';
-import { formatPhone, isValidPhone } from '@/lib/phone';
+import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 
 const LIST_PATH = '/kkiru/listings';
 
@@ -112,7 +112,9 @@ function validateRequired(values: FormValues): string | null {
     return '임대료·보증금·권리금을 입력해 주세요. 없으면 0을 넣어 주세요.';
   }
 
-  return isValidPhone(values.clientPhone) ? null : '의뢰인 연락처를 바르게 입력해 주세요.';
+  return isValidMobilePhone(values.clientPhone)
+    ? null
+    : '의뢰인 연락처를 010-0000-0000 형식으로 입력해 주세요.';
 }
 
 function buildInput(values: FormValues): KkiruListingInput | string {
@@ -180,7 +182,7 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
 
   return (
     <form
-      aria-label={listing ? '매물 수정' : '매물 추가'}
+      aria-label={listing ? '매물 수정' : '새 매물'}
       className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
       onSubmit={handleSubmit}
     >

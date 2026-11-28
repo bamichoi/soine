@@ -43,7 +43,8 @@ export function PhoneField() {
       typeof value === 'string' ? value.replace(/[\s-]/g, '') : value,
     ),
     IsString(),
-    Matches(/^0\d{8,10}$/, { message: 'phone must be a Korean phone number' }),
+    // 끼루 연락처는 휴대폰 번호만 받는다: 010 + 8자리 (010-0000-0000)
+    Matches(/^010\d{8}$/, { message: 'phone must be a mobile number like 010-1234-5678' }),
   );
 }
 

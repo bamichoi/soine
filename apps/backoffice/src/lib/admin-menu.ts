@@ -19,11 +19,11 @@ export const ADMIN_MENUS: Record<AdminService, AdminMenuItem[]> = {
   ],
   kkiru: [
     { href: '/kkiru/schedule', icon: 'calendar', label: '일정' },
-    { href: '/kkiru/customers', icon: 'users', label: '고객' },
+    { href: '/kkiru/listings', icon: 'home', label: '매물' },
     { href: '/kkiru/consultations', icon: 'message', label: '상담' },
     { href: '/kkiru/meetings', icon: 'handshake', label: '미팅' },
-    { href: '/kkiru/listings', icon: 'home', label: '매물' },
     { href: '/kkiru/contracts', icon: 'file-text', label: '계약' },
+    { href: '/kkiru/customers', icon: 'users', label: '고객' },
     { href: '/kkiru/ads', icon: 'megaphone', label: '광고' },
     { href: '/kkiru/income', icon: 'wallet', label: '수입' },
   ],

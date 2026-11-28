@@ -1,10 +1,18 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { KkiruMeetingTable } from '@/components/kkiru-meeting-pages';
 
 export const metadata: Metadata = {
   title: '미팅 | 끼루',
 };
 
 export default function KkiruMeetingsPage() {
-  // 화면 제목은 상단 현재 위치에 표시되므로, 제목은 보조기기용으로만 둔다.
-  return <h1 className="sr-only">미팅</h1>;
+  return (
+    <div className="p-4 md:p-8">
+      <h1 className="sr-only">미팅</h1>
+      <Suspense>
+        <KkiruMeetingTable />
+      </Suspense>
+    </div>
+  );
 }

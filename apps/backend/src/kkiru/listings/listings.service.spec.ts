@@ -23,7 +23,7 @@ const LISTING = {
 };
 
 describe('KkiruListingsService', () => {
-  it('offers only available listings when picking', async () => {
+  it('offers listings that are not contracted when picking', async () => {
     const findMany = jest.fn(() => Promise.resolve([LISTING]));
     const service = new KkiruListingsService({
       kkiruListing: { findMany },
@@ -33,7 +33,7 @@ describe('KkiruListingsService', () => {
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { ...buildListingSearch('연남'), status: 'available' },
+        where: { ...buildListingSearch('연남'), status: { not: 'contracted' } },
       }),
     );
     expect(options[0]).toMatchObject({ areaM2: 66.12, code: 'P7K3FQ9A', name: '연남동 코너 상가' });

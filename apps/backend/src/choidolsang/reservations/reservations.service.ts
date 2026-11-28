@@ -20,6 +20,9 @@ import {
   type ListReservationsQueryDto,
   type ReservationCalendarQueryDto,
   type ReservationFieldsDto,
+  type ReservationSearchField,
+  type ReservationSortField,
+  type ReservationSortOrder,
   type UpdateReservationDto,
 } from './dto/create-reservation.dto';
 
@@ -153,19 +156,74 @@ function isUniqueViolation(error: unknown, field: string): boolean {
   );
 }
 
+type ReservationWhere = Prisma.ChoidolsangReservationWhereInput;
+
+/**
+ * 예약 번호·예약자·연락처·아기 이름·돌상 컨셉·행사 장소로 찾는다. field로 한 항목만 고를 수 있다.
+ * 조건을 만들 수 없는 검색어(예: 번호 형식이 아님)로 한 항목을 고르면 결과가 없다.
+ */
+export function buildReservationWhere(
+  field: ReservationSearchField,
+  query: string,
+): ReservationWhere {
+  if (!query) {
+    return {};
+  }
+
+  const contains = { contains: query, mode: 'insensitive' as const };
+  const code = normalizeInquiryCode(query.replace(/^#/, ''));
+  const digits = query.replace(/\D/g, '');
+  const conditions: Record<Exclude<ReservationSearchField, 'all'>, ReservationWhere | null> = {
+    babyName: { babyName: contains },
+    code: code ? { code: { contains: code } } : null,
+    concept: { concept: { name: contains } },
+    customerName: { customerName: contains },
+    customerPhone: digits.length >= 3 ? { customerPhone: { contains: digits } } : null,
+    eventLocation: { eventLocation: contains },
+  };
+
+  if (field !== 'all') {
+    return conditions[field] ?? { id: { in: [] } };
+  }
+
+  // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
+  return { OR: Object.values(conditions).filter((condition) => condition !== null) };
+}
+
+const RESERVATION_ORDER_BY: Record<
+  ReservationSortField,
+  (order: ReservationSortOrder) => Prisma.ChoidolsangReservationOrderByWithRelationInput
+> = {
+  babyName: (order) => ({ babyName: order }),
+  concept: (order) => ({ concept: { name: order } }),
+  customerName: (order) => ({ customerName: order }),
+  eventAt: (order) => ({ eventAt: order }),
+  status: (order) => ({ status: order }),
+  totalAmount: (order) => ({ totalAmount: order }),
+};
+
 @Injectable()
 export class ChoidolsangReservationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list({ page = 1 }: ListReservationsQueryDto = {}): Promise<ReservationListResponse> {
+  async list({
+    field = 'all',
+    order = 'desc',
+    page = 1,
+    q = '',
+    sort = 'eventAt',
+    status,
+  }: ListReservationsQueryDto = {}): Promise<ReservationListResponse> {
+    const where = { ...buildReservationWhere(field, q), ...(status ? { status } : {}) };
     const [total, reservations] = await this.prisma.$transaction([
-      this.prisma.choidolsangReservation.count(),
+      this.prisma.choidolsangReservation.count({ where }),
       this.prisma.choidolsangReservation.findMany({
         include: RESERVATION_INCLUDE,
-        // 행사 날짜가 늦은 것부터. 같은 시각이면 최근 예약부터.
-        orderBy: [{ eventAt: 'desc' }, { createdAt: 'desc' }],
+        // 기본은 행사 날짜가 늦은 것부터. 같은 값끼리는 행사가 늦은 것, 최근 예약 순.
+        orderBy: [RESERVATION_ORDER_BY[sort](order), { eventAt: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * RESERVATION_PAGE_SIZE,
         take: RESERVATION_PAGE_SIZE,
+        where,
       }),
     ]);
 

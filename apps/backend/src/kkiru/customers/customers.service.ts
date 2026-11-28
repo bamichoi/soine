@@ -7,13 +7,14 @@ import {
 } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  KKIRU_PAGE_SIZE,
-  type PageQueryDto,
-  toDateString,
-  toPagination,
-} from '../common/kkiru-fields';
-import type { CustomerDto } from './dto/customer.dto';
+import { KKIRU_PAGE_SIZE, toDateString, toPagination } from '../common/kkiru-fields';
+import { pickSearch, type SortOrder } from '../common/list-query';
+import type {
+  CustomerDto,
+  CustomerSearchField,
+  CustomerSortField,
+  ListCustomersQueryDto,
+} from './dto/customer.dto';
 
 const CODE_GENERATION_ATTEMPTS = 5;
 
@@ -27,6 +28,7 @@ export type CustomerSummary = {
 };
 
 export type CustomerDetail = Omit<CustomerSummary, 'consultationCount'> & {
+  memo: string | null;
   /** 이 고객의 상담 (상담일 최근 순) */
   consultations: {
     code: string;
@@ -54,29 +56,40 @@ function isUniqueViolation(error: unknown, field: string): boolean {
   );
 }
 
-/** 이름·연락처·고객 번호로 찾는다. 연락처는 하이픈 없이 숫자 일부로도 찾는다. */
-export function buildCustomerWhere(query: string): Prisma.KkiruCustomerWhereInput {
+/**
+ * 이름·연락처·고객 번호로 찾는다. field로 한 항목만 고를 수 있다.
+ * 연락처는 하이픈 없이 숫자 일부로도 찾는다.
+ */
+export function buildCustomerWhere(
+  query: string,
+  field: CustomerSearchField = 'all',
+): Prisma.KkiruCustomerWhereInput {
   if (!query) {
     return {};
   }
 
   const digits = query.replace(/\D/g, '');
   const code = normalizeRandomCode(query);
-  const conditions: Prisma.KkiruCustomerWhereInput[] = [
-    { name: { contains: query, mode: 'insensitive' } },
-  ];
 
-  if (digits.length >= 3) {
-    conditions.push({ phone: { contains: digits } });
-  }
-
-  if (code) {
-    conditions.push({ code: { contains: code } });
-  }
-
-  // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
-  return { OR: conditions };
+  return pickSearch<Prisma.KkiruCustomerWhereInput>(
+    {
+      code: code ? { code: { contains: code } } : null,
+      name: { name: { contains: query, mode: 'insensitive' } },
+      phone: digits.length >= 3 ? { phone: { contains: digits } } : null,
+    },
+    field,
+  );
 }
+
+const CUSTOMER_ORDER_BY: Record<
+  CustomerSortField,
+  (order: SortOrder) => Prisma.KkiruCustomerOrderByWithRelationInput
+> = {
+  consultationCount: (order) => ({ consultations: { _count: order } }),
+  createdAt: (order) => ({ createdAt: order }),
+  name: (order) => ({ name: order }),
+  phone: (order) => ({ phone: order }),
+};
 
 function toSummary(
   customer: KkiruCustomer & { _count: { consultations: number } },
@@ -95,13 +108,19 @@ function toSummary(
 export class KkiruCustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list({ page = 1, q = '' }: PageQueryDto = {}): Promise<CustomerListResponse> {
-    const where = buildCustomerWhere(q);
+  async list({
+    field = 'all',
+    order = 'desc',
+    page = 1,
+    q = '',
+    sort = 'createdAt',
+  }: ListCustomersQueryDto = {}): Promise<CustomerListResponse> {
+    const where = buildCustomerWhere(q, field);
     const [total, customers] = await this.prisma.$transaction([
       this.prisma.kkiruCustomer.count({ where }),
       this.prisma.kkiruCustomer.findMany({
         include: { _count: { select: { consultations: true } } },
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        orderBy: [CUSTOMER_ORDER_BY[sort](order), { createdAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * KKIRU_PAGE_SIZE,
         take: KKIRU_PAGE_SIZE,
         where,
@@ -153,6 +172,7 @@ export class KkiruCustomersService {
       })),
       createdAt: customer.createdAt.toISOString(),
       id: customer.id,
+      memo: customer.memo,
       name: customer.name,
       phone: customer.phone,
       updatedAt: customer.updatedAt.toISOString(),
@@ -164,7 +184,12 @@ export class KkiruCustomersService {
     for (let attempt = 1; ; attempt += 1) {
       try {
         const customer = await this.prisma.kkiruCustomer.create({
-          data: { code: generateRandomCode(), name: input.name, phone: input.phone },
+          data: {
+            code: generateRandomCode(),
+            memo: input.memo ?? null,
+            name: input.name,
+            phone: input.phone,
+          },
         });
 
         return this.findByCode(customer.code);
@@ -190,7 +215,7 @@ export class KkiruCustomersService {
 
     try {
       const { count } = await this.prisma.kkiruCustomer.updateMany({
-        data: { name: input.name, phone: input.phone },
+        data: { memo: input.memo ?? null, name: input.name, phone: input.phone },
         where: { code },
       });
 

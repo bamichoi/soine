@@ -1,12 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AdminSessionGuard, RequireAdminService } from '../../admin-auth/admin-session.guard';
-// biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
-import { PageQueryDto } from '../common/kkiru-fields';
 import type { CustomerDetail, CustomerListResponse, CustomerSummary } from './customers.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { KkiruCustomersService } from './customers.service';
 // biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
-import { CustomerDto, CustomerLookupQueryDto } from './dto/customer.dto';
+import { CustomerDto, CustomerLookupQueryDto, ListCustomersQueryDto } from './dto/customer.dto';
 
 // 끼루 데이터는 삭제하지 않으므로 삭제 API가 없다.
 @Controller('admin/kkiru/customers')
@@ -16,7 +14,7 @@ export class KkiruCustomersController {
   constructor(private readonly customersService: KkiruCustomersService) {}
 
   @Get()
-  list(@Query() query: PageQueryDto): Promise<CustomerListResponse> {
+  list(@Query() query: ListCustomersQueryDto): Promise<CustomerListResponse> {
     return this.customersService.list(query);
   }
 

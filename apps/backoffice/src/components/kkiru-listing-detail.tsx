@@ -5,10 +5,10 @@ import type { ReactNode } from 'react';
 import { CopyCodeButton } from '@/components/copy-code-button';
 import { KkiruListingForm, KkiruListingLoader } from '@/components/kkiru-listing-form';
 import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
+import { PhoneNumber } from '@/components/phone-number';
 import { formatArea, formatManwon } from '@/lib/kkiru-format';
 import type { KkiruListing } from '@/lib/kkiru-listings-api';
 import { LISTING_STATUS_LABELS } from '@/lib/kkiru-status';
-import { formatPhone } from '@/lib/phone';
 
 const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
 
@@ -70,7 +70,7 @@ function ListingBody({ listing }: { listing: KkiruListing }) {
         <dl className="grid gap-x-8 gap-y-5 border-t border-[var(--line)] pt-5 sm:grid-cols-2">
           <InfoItem label="의뢰인">{listing.clientName}</InfoItem>
           <InfoItem label="의뢰인 연락처">
-            <span className="tabular-nums">{formatPhone(listing.clientPhone)}</span>
+            <PhoneNumber phone={listing.clientPhone} />
           </InfoItem>
         </dl>
       </div>

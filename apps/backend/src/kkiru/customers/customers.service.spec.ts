@@ -42,9 +42,14 @@ describe('buildCustomerWhere', () => {
       ],
     });
     expect(buildCustomerWhere('김임차')).toEqual({
-      // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
-      OR: [{ name: { contains: '김임차', mode: 'insensitive' } }],
+      name: { contains: '김임차', mode: 'insensitive' },
     });
+  });
+
+  it('searches only the chosen field', () => {
+    expect(buildCustomerWhere('010-1234', 'phone')).toEqual({ phone: { contains: '0101234' } });
+    // 이름 검색어는 연락처 항목으로 찾을 수 없으므로 아무것도 맞지 않는다.
+    expect(buildCustomerWhere('김임차', 'phone')).toEqual({ id: { in: [] } });
   });
 });
 
@@ -57,6 +62,7 @@ describe('KkiruCustomersService', () => {
     expect(customer.create).toHaveBeenCalledWith({
       data: {
         code: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{8}$/),
+        memo: null,
         name: '김임차',
         phone: '01012345678',
       },
@@ -82,7 +88,7 @@ describe('KkiruCustomersService', () => {
     await service.update('c7k3fq9a', { name: '김임차', phone: '01099998888' });
 
     expect(customer.updateMany).toHaveBeenCalledWith({
-      data: { name: '김임차', phone: '01099998888' },
+      data: { memo: null, name: '김임차', phone: '01099998888' },
       where: { code: 'C7K3FQ9A' },
     });
   });

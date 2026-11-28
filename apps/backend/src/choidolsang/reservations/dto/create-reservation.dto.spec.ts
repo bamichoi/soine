@@ -47,6 +47,12 @@ describe('CreateReservationDto', () => {
     await expect(validateInput({ ...VALID, customerPhone: '12345' })).resolves.toContain(
       'customerPhone',
     );
+    await expect(validateInput({ ...VALID, customerPhone: '010-345-6849' })).resolves.toContain(
+      'customerPhone',
+    );
+    await expect(validateInput({ ...VALID, customerPhone: '02-1234-5678' })).resolves.toContain(
+      'customerPhone',
+    );
     await expect(validateInput({ ...VALID, customerPhone: '010-abcd-5678' })).resolves.toContain(
       'customerPhone',
     );

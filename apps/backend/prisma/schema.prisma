@@ -235,6 +235,8 @@ model KkiruCustomer {
   name          String              @db.VarChar(100)
   /// 연락처. 숫자만 저장하며 고객마다 하나뿐이다.
   phone         String              @unique @db.VarChar(20)
+  /// 고객 메모 (선택)
+  memo          String?             @db.Text
   createdAt     DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
   consultations KkiruConsultation[]
@@ -245,6 +247,8 @@ model KkiruCustomer {
 
 enum KkiruListingStatus {
   available // 계약가능
+  meeting // 미팅중
+  contracting // 계약중
   contracted // 계약완료
 
   @@map("listing_status")

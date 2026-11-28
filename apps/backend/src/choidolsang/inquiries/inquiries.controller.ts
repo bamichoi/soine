@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -27,6 +26,7 @@ import type { InquiryDetail, InquiryListResponse } from './inquiries.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { ChoidolsangInquiriesService } from './inquiries.service';
 
+// 문의와 문의 로그 기록은 삭제하지 않는다. 수정만 할 수 있다.
 @Controller('admin/choidolsang/inquiries')
 @RequireAdminService('choidolsang')
 @UseGuards(AdminSessionGuard)
@@ -57,14 +57,6 @@ export class ChoidolsangInquiriesController {
     return this.inquiriesService.updateRecord(code, recordId, body);
   }
 
-  @Delete(':code/records/:recordId')
-  removeRecord(
-    @Param('code') code: string,
-    @Param('recordId', ParseUUIDPipe) recordId: string,
-  ): Promise<InquiryDetail> {
-    return this.inquiriesService.removeRecord(code, recordId);
-  }
-
   @Post(':code/reject')
   @HttpCode(HttpStatus.OK)
   reject(@Param('code') code: string, @Body() body: RejectInquiryDto): Promise<InquiryDetail> {
@@ -85,11 +77,5 @@ export class ChoidolsangInquiriesController {
   @Patch(':code')
   update(@Param('code') code: string, @Body() body: UpdateInquiryDto): Promise<InquiryDetail> {
     return this.inquiriesService.update(code, body);
-  }
-
-  @Delete(':code')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('code') code: string): Promise<void> {
-    return this.inquiriesService.remove(code);
   }
 }

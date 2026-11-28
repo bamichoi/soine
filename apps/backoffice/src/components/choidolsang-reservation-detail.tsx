@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CopyCodeButton } from '@/components/copy-code-button';
 import { Icon } from '@/components/icon';
 import { ReservationStatusBadge } from '@/components/reservation-status-badge';
 import { AdminApiError } from '@/lib/admin-auth-api';
@@ -61,9 +62,10 @@ function ReservationBody({ reservation }: { reservation: Reservation }) {
     <div className="flex flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p className="flex items-baseline gap-2 text-sm">
+          <p className="flex items-center gap-2 text-sm">
             <span className="text-[var(--muted)]">예약 번호</span>
             <span className="font-mono tracking-wide">{reservation.code}</span>
+            <CopyCodeButton code={reservation.code} label="예약 번호" />
           </p>
           <Link
             className="flex h-7 items-center border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]"

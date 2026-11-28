@@ -32,7 +32,7 @@ import {
   updateReservation,
 } from '@/lib/choidolsang-reservations-api';
 import { formatWon, parseAmountText, toAmountText } from '@/lib/money';
-import { formatPhone, isValidPhone } from '@/lib/phone';
+import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 import { type StringListItem, toStringListItems, toStringListValues } from '@/lib/string-list';
 
 const INQUIRIES_PATH = '/choidolsang/inquiries';
@@ -114,8 +114,8 @@ function validateRequired(values: FormValues): string | null {
     return '예약자 성함을 입력해 주세요.';
   }
 
-  if (!isValidPhone(values.customerPhone)) {
-    return '예약자 연락처를 바르게 입력해 주세요. (예: 010-1234-5678)';
+  if (!isValidMobilePhone(values.customerPhone)) {
+    return '예약자 연락처를 010-0000-0000 형식으로 입력해 주세요.';
   }
 
   if (!(values.eventDate && values.eventTime)) {
