@@ -2,6 +2,13 @@
 
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { AdminApiError } from '@/lib/admin-auth-api';
+import {
+  DANGER_PRIMARY_BUTTON_CLASS_NAME,
+  ERROR_BOX_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 
 type ReasonDialogProps = {
   title: string;
@@ -14,6 +21,7 @@ type ReasonDialogProps = {
 };
 
 // 사유를 꼭 적어야 하는 상태 변경(미팅중단·재개, 계약취소)을 확인하는 모달.
+// 현재 끼루 전용. 끼루 모달 모양(docs/design/kkiru-style-guide.md '모달')이다.
 export function ReasonDialog({
   title,
   label,
@@ -73,7 +81,7 @@ export function ReasonDialog({
   return (
     <dialog
       aria-labelledby={titleId}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] border border-[var(--line)] bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-[0_12px_40px_rgba(16,24,40,0.16)] backdrop:bg-black/40"
       onCancel={(event) => {
         if (isSubmitting) {
           event.preventDefault();
@@ -83,10 +91,10 @@ export function ReasonDialog({
       ref={dialogRef}
     >
       <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
-        <h2 className="text-lg font-semibold" id={titleId}>
+        <h2 className="text-lg font-extrabold" id={titleId}>
           {title}
         </h2>
-        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={reasonId}>
+        <label className="flex flex-col gap-2 text-sm font-semibold" htmlFor={reasonId}>
           <span>
             {label}
             <span aria-hidden="true" className="ml-0.5 text-[var(--error)]">
@@ -94,7 +102,7 @@ export function ReasonDialog({
             </span>
           </span>
           <textarea
-            className="min-h-28 w-full resize-y border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-normal leading-relaxed outline-none focus:border-[var(--brand)]"
+            className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28 font-normal`}
             disabled={isSubmitting}
             id={reasonId}
             maxLength={5000}
@@ -104,13 +112,13 @@ export function ReasonDialog({
           />
         </label>
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
           <button
-            className="h-10 border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
+            className={SECONDARY_BUTTON_CLASS_NAME}
             disabled={isSubmitting}
             onClick={onClose}
             type="button"
@@ -118,11 +126,9 @@ export function ReasonDialog({
             취소
           </button>
           <button
-            className={`h-10 px-5 text-sm font-semibold text-white disabled:opacity-60 ${
-              tone === 'danger'
-                ? 'bg-[var(--error)] hover:opacity-90'
-                : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)]'
-            }`}
+            className={
+              tone === 'danger' ? DANGER_PRIMARY_BUTTON_CLASS_NAME : PRIMARY_BUTTON_CLASS_NAME
+            }
             disabled={isSubmitting}
             type="submit"
           >

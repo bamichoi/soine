@@ -2,6 +2,10 @@
 
 import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { Icon } from '@/components/icon';
+import { ICON_BUTTON_CLASS_NAME } from '@/lib/kkiru-ui';
+
+// 현재 끼루 전용 (고객 찾기·고객 추가). 끼루 모달 모양(docs/design/kkiru-style-guide.md '모달')이다.
+// 초이돌상에서 쓰게 되면 look prop으로 나눈다.
 
 type ModalProps = {
   isOpen: boolean;
@@ -48,32 +52,30 @@ export function Modal({
   return (
     <dialog
       aria-labelledby={titleId}
-      className={`m-auto max-h-[calc(100dvh-2rem)] ${widthClassName} border border-[var(--line)] bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-xl outline-none backdrop:bg-black/40`}
+      className={`m-auto max-h-[calc(100dvh-2rem)] ${widthClassName} rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-[0_12px_40px_rgba(16,24,40,0.16)] outline-none backdrop:bg-black/40`}
       onClose={onClose}
       ref={dialogRef}
     >
       <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
+        <header className="flex items-start justify-between gap-4 px-6 pt-6 pb-2">
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold" id={titleId}>
+            <h2 className="text-lg font-extrabold" id={titleId}>
               {title}
             </h2>
             {description ? <p className="text-xs text-[var(--muted)]">{description}</p> : null}
           </div>
           <button
             aria-label="닫기"
-            className="-mr-2 flex size-8 shrink-0 items-center justify-center text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+            className={`-mt-1 -mr-2 ${ICON_BUTTON_CLASS_NAME}`}
             onClick={onClose}
             type="button"
           >
             <Icon className="size-4" name="x" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
         {footer ? (
-          <footer className="flex justify-end gap-2 border-t border-[var(--line)] bg-[var(--background)] px-6 py-3">
-            {footer}
-          </footer>
+          <footer className="flex justify-end gap-2 px-6 pt-2 pb-6">{footer}</footer>
         ) : null}
       </div>
     </dialog>

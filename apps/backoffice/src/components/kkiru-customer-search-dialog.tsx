@@ -4,7 +4,13 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { Modal } from '@/components/modal';
 import { type KkiruCustomerSummary, listKkiruCustomers } from '@/lib/kkiru-customers-api';
-import { PRIMARY_BUTTON_CLASS_NAME } from '@/lib/kkiru-ui';
+import {
+  FAINT_CLASS_NAME,
+  FOCUS_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 import { EMPTY_LIST_QUERY } from '@/lib/list-query';
 import { formatPhone } from '@/lib/phone';
 
@@ -40,19 +46,21 @@ function CustomerResultRow({
   return (
     <li>
       <button
-        className="group flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-[var(--brand-soft)]"
+        className={`group flex w-full cursor-pointer items-center gap-4 rounded-lg px-3 py-3 text-left text-sm hover:bg-[var(--brand-soft)] ${FOCUS_CLASS_NAME}`}
         onClick={() => onPick(customer)}
         type="button"
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-medium">{customer.name}</span>
-          <span className="font-mono text-xs text-[var(--muted)]">{customer.code}</span>
+          <span className="truncate font-bold">{customer.name}</span>
+          <span className={`font-mono text-xs font-medium ${FAINT_CLASS_NAME}`} translate="no">
+            {customer.code}
+          </span>
         </span>
         <span className="shrink-0 tabular-nums">{formatPhone(customer.phone)}</span>
-        <span className="w-14 shrink-0 text-right text-xs text-[var(--muted)]">
+        <span className="w-14 shrink-0 text-right text-xs text-[var(--muted)] tabular-nums">
           미팅 {customer.meetingCount}건
         </span>
-        <span className="w-8 shrink-0 text-right text-xs font-medium text-[var(--brand)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="w-8 shrink-0 text-right text-xs font-bold text-[var(--brand)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
           선택
         </span>
       </button>
@@ -95,7 +103,7 @@ function SearchResults({
           없습니다.
         </span>
         <button
-          className="inline-flex h-9 items-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+          className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--foreground)]`}
           onClick={onAddInstead}
           type="button"
         >
@@ -108,15 +116,15 @@ function SearchResults({
 
   return (
     <section aria-label="검색 결과" className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-[var(--muted)]">
-        검색 결과 <span className="text-[var(--foreground)]">{state.total}명</span>
+      <h3 className="text-sm font-bold">
+        검색 결과 <em className="text-[var(--brand)] not-italic tabular-nums">{state.total}명</em>
         {state.total > state.items.length ? (
-          <span className="ml-2 font-normal">
+          <span className="ml-2 text-xs font-normal text-[var(--muted)]">
             앞의 {state.items.length}명만 보여 줍니다. 검색어를 더 자세히 입력해 주세요.
           </span>
         ) : null}
       </h3>
-      <ul className="flex max-h-80 flex-col divide-y divide-[var(--line)] overflow-y-auto border border-[var(--line)]">
+      <ul className="flex max-h-80 flex-col gap-0.5 overflow-y-auto rounded-xl bg-[var(--background)] p-1">
         {state.items.map((customer) => (
           <CustomerResultRow customer={customer} key={customer.id} onPick={onPick} />
         ))}
@@ -178,13 +186,13 @@ export function KkiruCustomerSearchDialog({
         <div className="flex gap-2">
           <div className="relative min-w-0 flex-1">
             <Icon
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-[var(--muted)]/70"
               name="search"
             />
             <input
               aria-label="이름 또는 전화번호"
               data-autofocus
-              className="h-10 w-full border border-[var(--line)] bg-[var(--surface)] pr-3 pl-9 text-sm outline-none focus:border-[var(--brand)]"
+              className={`${INPUT_CLASS_NAME} pl-10`}
               maxLength={100}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -199,7 +207,7 @@ export function KkiruCustomerSearchDialog({
             />
           </div>
           <button
-            className={PRIMARY_BUTTON_CLASS_NAME}
+            className={`${PRIMARY_BUTTON_CLASS_NAME} h-11`}
             disabled={state.kind === 'searching' || !query.trim()}
             onClick={() => void handleSearch()}
             type="button"

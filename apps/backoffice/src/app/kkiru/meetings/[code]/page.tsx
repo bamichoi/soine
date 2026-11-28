@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { BackToListLink } from '@/components/back-to-list-link';
 import { KkiruMeetingDetailView } from '@/components/kkiru-meeting-detail';
-import { PageTitleBar } from '@/components/page-title-bar';
 import { parseRouteCode } from '@/lib/kkiru-route';
 
 export const metadata: Metadata = {
@@ -25,8 +24,10 @@ export default async function KkiruMeetingDetailPage({
     <div className="p-4 md:p-8">
       <h1 className="sr-only">미팅</h1>
       <Suspense>
-        <div className="flex max-w-3xl flex-col gap-4">
-          <PageTitleBar actions={<BackToListLink href="/kkiru/meetings" />} title="미팅 상세" />
+        <div className="max-w-4xl">
+          <div className="mb-2 md:hidden">
+            <BackToListLink href="/kkiru/meetings" />
+          </div>
           <KkiruMeetingDetailView code={value} />
         </div>
       </Suspense>

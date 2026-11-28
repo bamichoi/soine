@@ -4,6 +4,7 @@ import {
   type FakeContract,
   type FakeLink,
   type FakeListing,
+  type FakeRecord,
 } from '../common/fake-kkiru-db.helper-spec';
 import { buildMeetingSearch, KkiruMeetingsService } from './meetings.service';
 
@@ -33,17 +34,20 @@ function setup({
   listings = [listing('listing-a', 'meeting'), listing('listing-b')],
   links = [{ listingId: 'listing-a', meetingId: 'meeting-1' }],
   contracts = [],
+  records = [],
 }: {
   meetingStatus?: string;
   stoppedAt?: Date | null;
   listings?: FakeListing[];
   links?: FakeLink[];
   contracts?: FakeContract[];
+  records?: FakeRecord[];
 } = {}) {
   const fake = createFakeKkiruDb({
     contracts,
     links,
     listings,
+    records,
     meetings: [{ code: CODE, id: 'meeting-1', status: meetingStatus, stoppedAt }],
   });
   const service = new KkiruMeetingsService(fake.prisma);
@@ -179,6 +183,89 @@ describe('KkiruMeetingsService listings', () => {
       NotFoundException,
     );
     await expect(setup().service.removeListing('ZZZZZZZZ', 'listing-a')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
+
+describe('KkiruMeetingsService records', () => {
+  const RECORD = { content: '현장 확인', recordedOn: '2026-11-28' };
+
+  function withRecord(listingId: string | null) {
+    return setup({
+      records: [{ content: '처음 내용', id: 'record-1', listingId, meetingId: 'meeting-1' }],
+    });
+  }
+
+  it('adds a record with or without a related meeting listing', async () => {
+    const { db, service } = setup();
+
+    await service.addRecord(CODE, { ...RECORD, listingId: 'listing-a' });
+    await service.addRecord(CODE, RECORD);
+
+    expect(db.records).toEqual([
+      expect.objectContaining({ content: '현장 확인', kind: 'note', listingId: 'listing-a' }),
+      expect.objectContaining({ content: '현장 확인', kind: 'note', listingId: null }),
+    ]);
+  });
+
+  it('refuses a related listing that is not a meeting listing', async () => {
+    const { db, service } = setup();
+
+    await expect(
+      service.addRecord(CODE, { ...RECORD, listingId: 'listing-b' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.records).toHaveLength(0);
+
+    const edit = withRecord(null);
+    await expect(
+      edit.service.updateRecord(CODE, 'record-1', { ...RECORD, listingId: 'listing-b' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(edit.db.records[0]).toEqual(
+      expect.objectContaining({ content: '처음 내용', listingId: null }),
+    );
+  });
+
+  it('sets, keeps and clears the related listing when editing', async () => {
+    const { db, service } = withRecord(null);
+
+    await service.updateRecord(CODE, 'record-1', { ...RECORD, listingId: 'listing-a' });
+    expect(db.records[0]).toEqual(
+      expect.objectContaining({ content: '현장 확인', listingId: 'listing-a' }),
+    );
+
+    await service.updateRecord(CODE, 'record-1', { ...RECORD, content: '내용만 고침' });
+    expect(db.records[0]).toEqual(
+      expect.objectContaining({ content: '내용만 고침', listingId: 'listing-a' }),
+    );
+
+    await service.updateRecord(CODE, 'record-1', { ...RECORD, listingId: null });
+    expect(db.records[0]).toEqual(expect.objectContaining({ listingId: null }));
+  });
+
+  it('keeps a related listing that was later removed from the meeting', async () => {
+    const { db, service } = setup({
+      records: [
+        { content: '처음 내용', id: 'record-1', listingId: 'listing-b', meetingId: 'meeting-1' },
+      ],
+    });
+
+    await service.updateRecord(CODE, 'record-1', { ...RECORD, listingId: 'listing-b' });
+
+    expect(db.records[0]).toEqual(expect.objectContaining({ listingId: 'listing-b' }));
+  });
+
+  it('keeps record links when the listing is removed from the meeting', async () => {
+    const { db, service } = withRecord('listing-a');
+
+    await service.removeListing(CODE, 'listing-a');
+
+    expect(db.links).toEqual([]);
+    expect(db.records[0]).toEqual(expect.objectContaining({ listingId: 'listing-a' }));
+  });
+
+  it('returns 404 for a record of another meeting', async () => {
+    await expect(setup().service.updateRecord(CODE, 'missing', RECORD)).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });

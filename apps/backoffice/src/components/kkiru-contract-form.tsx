@@ -23,10 +23,18 @@ import {
   type KkiruListingOption,
 } from '@/lib/kkiru-listings-api';
 import { type KkiruListingStatus, LISTING_STATUS_LABELS } from '@/lib/kkiru-status';
+import {
+  chipClassName,
+  ERROR_BOX_CLASS_NAME,
+  FORM_SECTION_TITLE_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+  TEXT_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 import { formatPhone, isValidMobilePhone } from '@/lib/phone';
-
-const CONTROL_CLASS_NAME =
-  'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
 type KkiruContractFormProps =
   | { mode: 'create'; meeting: MeetingDetail; initialListingCode?: string | null }
@@ -266,19 +274,17 @@ function TargetListingField({
 
   if (listing) {
     body = (
-      <div className="flex flex-wrap items-center gap-3 border border-[var(--brand)] bg-[var(--brand-soft)] px-3 py-2 text-sm">
-        <span className="font-mono text-xs">{listing.code}</span>
-        <span className="font-medium">{listing.name}</span>
-        <span className="text-xs text-[var(--muted)]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-[var(--brand-soft)] px-3.5 py-3 text-[15px]">
+        <span className="font-mono text-xs font-medium text-[var(--muted)]" translate="no">
+          {listing.code}
+        </span>
+        <span className="font-bold">{listing.name}</span>
+        <span className="text-[13px] text-[var(--muted)] tabular-nums">
           보증금 {formatManwon(listing.deposit)} / 월 {formatManwon(listing.rent)} · 권리금{' '}
           {formatManwon(listing.premium)}
         </span>
         {onClear ? (
-          <button
-            className="ml-auto cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
-            onClick={onClear}
-            type="button"
-          >
+          <button className={`ml-auto ${TEXT_BUTTON_CLASS_NAME}`} onClick={onClear} type="button">
             다른 매물
           </button>
         ) : null}
@@ -298,7 +304,7 @@ function TargetListingField({
 
   return (
     <section className="flex flex-col gap-5">
-      <FormField label="대상 매물" required>
+      <FormField look="kkiru" label="대상 매물" required>
         <div className="flex flex-col gap-2">
           {body}
           {error ? (
@@ -339,11 +345,7 @@ function YesNo({
       ].map((option) => (
         <button
           aria-pressed={value === option.value}
-          className={`h-10 border px-4 text-sm ${
-            value === option.value
-              ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
-              : 'border-[var(--line)] hover:bg-[var(--background)]'
-          }`}
+          className={chipClassName(value === option.value, 'card')}
           key={option.text}
           onClick={() => onChange(option.value)}
           type="button"
@@ -446,12 +448,14 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
   return (
     <form
       aria-label={isEdit ? '계약 수정' : '계약 진행'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
-      <p className="mb-6 bg-[var(--background)] px-4 py-3 text-sm">
-        <span className="text-[var(--muted)]">케이스 </span>
-        <span className="font-mono">{target.caseCode}</span>
+      <p className="mb-8 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-semibold">
+        <span className="font-normal text-[var(--muted)]">케이스 </span>
+        <span className="font-mono" translate="no">
+          {target.caseCode}
+        </span>
         <span className="text-[var(--muted)]"> · </span>
         {target.title}
         <span className="text-[var(--muted)]"> · </span>
@@ -478,10 +482,10 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
         />
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">당사자</h3>
-          <FormField htmlFor={id('contracted-on')} label="계약 일자" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>당사자</h3>
+          <FormField look="kkiru" htmlFor={id('contracted-on')} label="계약 일자" required>
             <input
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('contracted-on')}
               onChange={(e) => update('contractedOn', e.target.value)}
               required
@@ -489,17 +493,17 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.contractedOn}
             />
           </FormField>
-          <FormField label="임차인" required>
-            <p className="flex h-10 items-center gap-3 text-sm">
+          <FormField look="kkiru" label="임차인" required>
+            <p className="flex h-11 items-center gap-3 text-[15px] font-semibold">
               {target.customer.name}
               <span className="text-[var(--muted)] tabular-nums">
                 {formatPhone(target.customer.phone)}
               </span>
             </p>
           </FormField>
-          <FormField label="임대인" required>
+          <FormField look="kkiru" label="임대인" required>
             <div className="flex flex-col gap-2">
-              <label className="flex h-10 cursor-pointer items-center gap-2 text-sm">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px]">
                 <input
                   checked={values.sameAsClient}
                   className="size-4 accent-[var(--brand)]"
@@ -513,7 +517,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
                 <div className="flex flex-wrap gap-2">
                   <input
                     aria-label="임대인 이름"
-                    className={`${CONTROL_CLASS_NAME} sm:w-48`}
+                    className={`${INPUT_CLASS_NAME} sm:w-48`}
                     maxLength={100}
                     onChange={(e) => update('landlordName', e.target.value)}
                     placeholder="임대인 이름"
@@ -521,7 +525,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
                   />
                   <input
                     aria-label="임대인 연락처"
-                    className={`${CONTROL_CLASS_NAME} tabular-nums sm:w-48`}
+                    className={`${INPUT_CLASS_NAME} tabular-nums sm:w-48`}
                     inputMode="tel"
                     onChange={(e) => update('landlordPhone', formatPhone(e.target.value))}
                     placeholder="010-1234-5678"
@@ -535,8 +539,8 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">계약 조건 (실제 금액)</h3>
-          <FormField htmlFor={id('deposit')} label="보증금" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>계약 조건 (실제 금액)</h3>
+          <FormField look="kkiru" htmlFor={id('deposit')} label="보증금" required>
             <ManwonInput
               id={id('deposit')}
               onChange={(text) => updateAmountForBalance('depositText', text)}
@@ -544,7 +548,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.depositText}
             />
           </FormField>
-          <FormField htmlFor={id('rent')} label="임대료" required>
+          <FormField look="kkiru" htmlFor={id('rent')} label="임대료" required>
             <ManwonInput
               id={id('rent')}
               onChange={(text) => update('rentText', text)}
@@ -552,7 +556,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.rentText}
             />
           </FormField>
-          <FormField htmlFor={id('premium')} label="권리금" required>
+          <FormField look="kkiru" htmlFor={id('premium')} label="권리금" required>
             <ManwonInput
               id={id('premium')}
               onChange={(text) => update('premiumText', text)}
@@ -560,11 +564,11 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.premiumText}
             />
           </FormField>
-          <FormField htmlFor={id('lease-start')} label="임대차 기간" required>
+          <FormField look="kkiru" htmlFor={id('lease-start')} label="임대차 기간" required>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 aria-label="임대차 시작일"
-                className={`${CONTROL_CLASS_NAME} sm:w-44`}
+                className={`${INPUT_CLASS_NAME} sm:w-44`}
                 id={id('lease-start')}
                 onChange={(e) => update('leaseStartOn', e.target.value)}
                 required
@@ -574,7 +578,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               <span className="text-[var(--muted)]">~</span>
               <input
                 aria-label="임대차 종료일"
-                className={`${CONTROL_CLASS_NAME} sm:w-44`}
+                className={`${INPUT_CLASS_NAME} sm:w-44`}
                 onChange={(e) => update('leaseEndOn', e.target.value)}
                 required
                 type="date"
@@ -582,9 +586,9 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               />
             </div>
           </FormField>
-          <FormField htmlFor={id('terms')} label="특약 사항">
+          <FormField look="kkiru" htmlFor={id('terms')} label="특약 사항">
             <textarea
-              className={`${CONTROL_CLASS_NAME} h-auto min-h-28 resize-y py-2.5 leading-relaxed`}
+              className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28 resize-y py-2.5 leading-relaxed`}
               id={id('terms')}
               maxLength={5000}
               onChange={(e) => update('specialTerms', e.target.value)}
@@ -594,8 +598,8 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">계약금·수수료</h3>
-          <FormField htmlFor={id('down')} label="계약금" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>계약금·수수료</h3>
+          <FormField look="kkiru" htmlFor={id('down')} label="계약금" required>
             <ManwonInput
               id={id('down')}
               onChange={(text) => updateAmountForBalance('downPaymentText', text)}
@@ -603,7 +607,13 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.downPaymentText}
             />
           </FormField>
-          <FormField hint={balanceHint(values)} htmlFor={id('balance')} label="잔금" required>
+          <FormField
+            look="kkiru"
+            hint={balanceHint(values)}
+            htmlFor={id('balance')}
+            label="잔금"
+            required
+          >
             <ManwonInput
               id={id('balance')}
               onChange={(text) =>
@@ -613,9 +623,9 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.balanceText}
             />
           </FormField>
-          <FormField htmlFor={id('balance-due')} label="잔금일" required>
+          <FormField look="kkiru" htmlFor={id('balance-due')} label="잔금일" required>
             <input
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('balance-due')}
               min={values.contractedOn || undefined}
               onChange={(e) => update('balanceDueOn', e.target.value)}
@@ -624,7 +634,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.balanceDueOn}
             />
           </FormField>
-          <FormField htmlFor={id('commission')} label="수수료" required>
+          <FormField look="kkiru" htmlFor={id('commission')} label="수수료" required>
             <ManwonInput
               id={id('commission')}
               onChange={(text) => update('commissionText', text)}
@@ -632,14 +642,14 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
               value={values.commissionText}
             />
           </FormField>
-          <FormField label="내 매물 여부" required>
+          <FormField look="kkiru" label="내 매물 여부" required>
             <YesNo
               label="내 매물 여부"
               onChange={(value) => update('isMyListing', value)}
               value={values.isMyListing}
             />
           </FormField>
-          <FormField label="내 손님 여부" required>
+          <FormField look="kkiru" label="내 손님 여부" required>
             <YesNo
               label="내 손님 여부"
               onChange={(value) => update('isMyClient', value)}
@@ -651,19 +661,16 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
 
       <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
-          >
+          <Link className={SECONDARY_BUTTON_CLASS_NAME} href={cancelHref}>
             취소
           </Link>
           <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:opacity-60"
+            className={PRIMARY_BUTTON_CLASS_NAME}
             disabled={isSubmitting || isLoadingListing}
             type="submit"
           >

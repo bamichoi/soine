@@ -257,35 +257,37 @@ enum KkiruListingStatus {
 
 /// 끼루 매물(임대). 계약완료된 매물이 다시 나오면 새로 등록한다.
 model KkiruListing {
-  id            String                @id @default(uuid()) @db.Uuid
+  id             String                @id @default(uuid()) @db.Uuid
   /// 매물 번호. 8자리 무작위 코드
-  code          String                @unique @db.VarChar(16)
-  name          String                @db.VarChar(100)
-  address       String                @db.VarChar(300)
+  code           String                @unique @db.VarChar(16)
+  name           String                @db.VarChar(100)
+  address        String                @db.VarChar(300)
   /// 면적(㎡). 화면에서 평으로 함께 보여 준다.
-  areaM2        Decimal               @db.Decimal(10, 2)
+  areaM2         Decimal               @db.Decimal(10, 2)
   /// 층수 (예: 1층, 지하1층, 2~3층)
-  floor         String                @db.VarChar(50)
+  floor          String                @db.VarChar(50)
   /// 임대료(월세, 만원)
-  rent          Int
+  rent           Int
   /// 보증금(만원)
-  deposit       Int
+  deposit        Int
   /// 권리금(만원)
-  premium       Int
-  hasParking    Boolean?
-  restroomCount Int?
+  premium        Int
+  hasParking     Boolean?
+  restroomCount  Int?
   /// 특징 (서술)
-  features      String?               @db.Text
+  features       String?               @db.Text
   /// 매물 의뢰인
-  clientName    String                @db.VarChar(100)
+  clientName     String                @db.VarChar(100)
   /// 의뢰인 연락처 (숫자만)
-  clientPhone   String                @db.VarChar(20)
+  clientPhone    String                @db.VarChar(20)
   /// 걸린 계약·미팅에서 자동으로 정한다 (common/status-sync.ts)
-  status        KkiruListingStatus    @default(available)
-  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
-  meetings      KkiruMeetingListing[]
-  contracts     KkiruContract[]
+  status         KkiruListingStatus    @default(available)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @db.Timestamptz(3)
+  meetings       KkiruMeetingListing[]
+  contracts      KkiruContract[]
+  /// 이 매물을 관련 매물로 남긴 미팅 기록
+  meetingRecords KkiruMeetingRecord[]
 
   @@index([createdAt(sort: Desc)], map: "listings_created_at_idx")
   @@map("listings")
@@ -375,10 +377,15 @@ model KkiruMeetingRecord {
   kind       KkiruMeetingRecordKind @default(note)
   recordedOn DateTime               @db.Date
   content    String                 @db.Text
+  /// 관련 매물(선택). 남길 때는 그 미팅의 미팅 매물이어야 한다. 나중에 미팅 매물에서 빠져도
+  /// 기록은 이력이므로 연결을 그대로 둔다.
+  listingId  String?                @db.Uuid
+  listing    KkiruListing?          @relation(fields: [listingId], references: [id], onDelete: Restrict)
   createdAt  DateTime               @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime               @updatedAt @db.Timestamptz(3)
 
   @@index([meetingId, recordedOn, createdAt], map: "meeting_records_meeting_id_idx")
+  @@index([listingId], map: "meeting_records_listing_id_idx")
   @@map("meeting_records")
   @@schema("kkiru")
 }

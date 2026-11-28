@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { FormField } from '@/components/form-field';
+import { KkiruLoader } from '@/components/kkiru-loader';
 import { ManwonInput } from '@/components/manwon-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
@@ -21,12 +22,20 @@ import {
   type KkiruListingInput,
   updateKkiruListing,
 } from '@/lib/kkiru-listings-api';
+import {
+  chipClassName,
+  ERROR_BOX_CLASS_NAME,
+  FORM_SECTION_TITLE_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  INPUT_UNIT_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 
 const LIST_PATH = '/kkiru/listings';
-
-const CONTROL_CLASS_NAME =
-  'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
 type FormValues = {
   name: string;
@@ -42,6 +51,13 @@ type FormValues = {
   clientName: string;
   clientPhone: string;
 };
+
+/** 주차는 하나만 고르는 칸이라 칩으로 둔다. */
+const PARKING_OPTIONS: { value: FormValues['parking']; label: string }[] = [
+  { label: '선택 안 함', value: '' },
+  { label: '가능', value: 'yes' },
+  { label: '불가', value: 'no' },
+];
 
 const EMPTY_VALUES: FormValues = {
   address: '',
@@ -183,17 +199,17 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
   return (
     <form
       aria-label={listing ? '매물 수정' : '새 매물'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-8" disabled={isSubmitting}>
         <legend className="sr-only">매물 정보</legend>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">매물</h3>
-          <FormField htmlFor={id('name')} label="매물 이름" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>매물</h3>
+          <FormField look="kkiru" htmlFor={id('name')} label="매물 이름" required>
             <input
-              className={CONTROL_CLASS_NAME}
+              className={INPUT_CLASS_NAME}
               id={id('name')}
               maxLength={100}
               onChange={(e) => update('name', e.target.value)}
@@ -201,9 +217,9 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.name}
             />
           </FormField>
-          <FormField htmlFor={id('address')} label="주소" required>
+          <FormField look="kkiru" htmlFor={id('address')} label="주소" required>
             <input
-              className={CONTROL_CLASS_NAME}
+              className={INPUT_CLASS_NAME}
               id={id('address')}
               maxLength={300}
               onChange={(e) => update('address', e.target.value)}
@@ -211,11 +227,11 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.address}
             />
           </FormField>
-          <FormField htmlFor={id('area')} label="면적" required>
+          <FormField look="kkiru" htmlFor={id('area')} label="면적" required>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative sm:w-48">
                 <input
-                  className={`${CONTROL_CLASS_NAME} pr-9 text-right tabular-nums`}
+                  className={`${INPUT_CLASS_NAME} pr-10 text-right tabular-nums`}
                   id={id('area')}
                   inputMode="decimal"
                   onChange={(e) => update('areaText', toDecimalText(e.target.value))}
@@ -223,9 +239,7 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
                   required
                   value={values.areaText}
                 />
-                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-                  ㎡
-                </span>
+                <span className={INPUT_UNIT_CLASS_NAME}>㎡</span>
               </div>
               <span className="text-sm text-[var(--muted)] tabular-nums">
                 {area
@@ -234,9 +248,9 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               </span>
             </div>
           </FormField>
-          <FormField htmlFor={id('floor')} label="층수" required>
+          <FormField look="kkiru" htmlFor={id('floor')} label="층수" required>
             <input
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('floor')}
               maxLength={50}
               onChange={(e) => update('floor', e.target.value)}
@@ -248,8 +262,8 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">금액</h3>
-          <FormField htmlFor={id('deposit')} label="보증금" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>금액</h3>
+          <FormField look="kkiru" htmlFor={id('deposit')} label="보증금" required>
             <ManwonInput
               id={id('deposit')}
               onChange={(text) => update('depositText', text)}
@@ -257,7 +271,7 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.depositText}
             />
           </FormField>
-          <FormField htmlFor={id('rent')} label="임대료" required>
+          <FormField look="kkiru" htmlFor={id('rent')} label="임대료" required>
             <ManwonInput
               id={id('rent')}
               onChange={(text) => update('rentText', text)}
@@ -265,7 +279,7 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.rentText}
             />
           </FormField>
-          <FormField htmlFor={id('premium')} label="권리금" required>
+          <FormField look="kkiru" htmlFor={id('premium')} label="권리금" required>
             <ManwonInput
               id={id('premium')}
               onChange={(text) => update('premiumText', text)}
@@ -276,22 +290,26 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">시설</h3>
-          <FormField htmlFor={id('parking')} label="주차">
-            <select
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
-              id={id('parking')}
-              onChange={(e) => update('parking', e.target.value as FormValues['parking'])}
-              value={values.parking}
-            >
-              <option value="">선택 안 함</option>
-              <option value="yes">가능</option>
-              <option value="no">불가</option>
-            </select>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>시설</h3>
+          <FormField label="주차" look="kkiru">
+            <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
+              <legend className="sr-only">주차</legend>
+              {PARKING_OPTIONS.map((option) => (
+                <button
+                  aria-pressed={values.parking === option.value}
+                  className={chipClassName(values.parking === option.value, 'card')}
+                  key={option.value}
+                  onClick={() => update('parking', option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </fieldset>
           </FormField>
-          <FormField htmlFor={id('restroom')} label="화장실 개수">
+          <FormField look="kkiru" htmlFor={id('restroom')} label="화장실 개수">
             <input
-              className={`${CONTROL_CLASS_NAME} text-right tabular-nums sm:w-32`}
+              className={`${INPUT_CLASS_NAME} text-right tabular-nums sm:w-32`}
               id={id('restroom')}
               inputMode="numeric"
               onChange={(e) =>
@@ -300,9 +318,9 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.restroomText}
             />
           </FormField>
-          <FormField htmlFor={id('features')} label="특징">
+          <FormField look="kkiru" htmlFor={id('features')} label="특징">
             <textarea
-              className={`${CONTROL_CLASS_NAME} h-auto min-h-28 resize-y py-2.5 leading-relaxed`}
+              className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28 resize-y py-2.5 leading-relaxed`}
               id={id('features')}
               maxLength={5000}
               onChange={(e) => update('features', e.target.value)}
@@ -312,10 +330,10 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">의뢰인</h3>
-          <FormField htmlFor={id('client-name')} label="의뢰인 이름" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>의뢰인</h3>
+          <FormField look="kkiru" htmlFor={id('client-name')} label="의뢰인 이름" required>
             <input
-              className={`${CONTROL_CLASS_NAME} sm:w-64`}
+              className={`${INPUT_CLASS_NAME} sm:w-64`}
               id={id('client-name')}
               maxLength={100}
               onChange={(e) => update('clientName', e.target.value)}
@@ -323,10 +341,10 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
               value={values.clientName}
             />
           </FormField>
-          <FormField htmlFor={id('client-phone')} label="의뢰인 연락처" required>
+          <FormField look="kkiru" htmlFor={id('client-phone')} label="의뢰인 연락처" required>
             <input
               autoComplete="off"
-              className={`${CONTROL_CLASS_NAME} tabular-nums sm:w-64`}
+              className={`${INPUT_CLASS_NAME} tabular-nums sm:w-64`}
               id={id('client-phone')}
               inputMode="tel"
               onChange={(e) => update('clientPhone', formatPhone(e.target.value))}
@@ -341,22 +359,18 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
 
       <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
           <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
+            className={SECONDARY_BUTTON_CLASS_NAME}
             href={listing ? `${LIST_PATH}/${listing.code}` : LIST_PATH}
           >
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -364,12 +378,6 @@ export function KkiruListingForm({ listing }: { listing?: KkiruListing }) {
     </form>
   );
 }
-
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; listing: KkiruListing };
 
 /** 매물을 불러와 그려 준다. 상세·수정 화면이 함께 쓴다. */
 export function KkiruListingLoader({
@@ -379,48 +387,9 @@ export function KkiruListingLoader({
   code: string;
   children: (listing: KkiruListing) => React.ReactNode;
 }) {
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-    setState({ kind: 'loading' });
-
-    getKkiruListing(code)
-      .then((listing) => {
-        if (isActive) {
-          setState({ kind: 'loaded', listing });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">매물을 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 매물을 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        매물을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  return <>{children(state.listing)}</>;
+  return (
+    <KkiruLoader load={getKkiruListing} loadKey={code} noun="매물">
+      {(listing) => children(listing)}
+    </KkiruLoader>
+  );
 }

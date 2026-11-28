@@ -13,7 +13,7 @@ const COLUMNS: ListColumn<KkiruListing>[] = [
     key: 'name',
     label: '매물 이름',
     render: (l) => (
-      <p className="max-w-[22rem] truncate" title={l.name}>
+      <p className="max-w-[22rem] truncate font-semibold" title={l.name}>
         {l.name}
       </p>
     ),
@@ -23,7 +23,7 @@ const COLUMNS: ListColumn<KkiruListing>[] = [
     key: 'address',
     label: '주소',
     render: (l) => (
-      <p className="max-w-[22rem] truncate" title={l.address}>
+      <p className="max-w-[22rem] truncate text-[var(--muted)]" title={l.address}>
         {l.address}
       </p>
     ),
@@ -55,7 +55,7 @@ const COLUMNS: ListColumn<KkiruListing>[] = [
     firstOrder: 'desc',
     key: 'premium',
     label: '권리금',
-    render: (l) => formatManwon(l.premium),
+    render: (l) => <span className="font-bold">{formatManwon(l.premium)}</span>,
     sortField: 'premium',
   },
   {
@@ -79,6 +79,7 @@ export function KkiruListingTable() {
       defaultSort={{ field: 'createdAt', order: 'desc' }}
       emptyText="아직 등록된 매물이 없습니다."
       load={listKkiruListings}
+      look="kkiru"
       minWidth="70rem"
       rowLink={(l) => ({
         extra: <CopyCodeButton code={l.code} label="매물 번호" />,

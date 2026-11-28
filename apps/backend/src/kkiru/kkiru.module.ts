@@ -4,6 +4,8 @@ import { KkiruContractsController } from './contracts/contracts.controller';
 import { KkiruContractsService } from './contracts/contracts.service';
 import { KkiruCustomersController } from './customers/customers.controller';
 import { KkiruCustomersService } from './customers/customers.service';
+import { KkiruIncomeController } from './income/income.controller';
+import { KkiruIncomeService } from './income/income.service';
 import { KkiruListingsController } from './listings/listings.controller';
 import { KkiruListingsService } from './listings/listings.service';
 import { KkiruMeetingsController } from './meetings/meetings.controller';
@@ -16,6 +18,7 @@ import { KkiruScheduleService } from './schedule/schedule.service';
   controllers: [
     KkiruContractsController,
     KkiruCustomersController,
+    KkiruIncomeController,
     KkiruListingsController,
     KkiruMeetingsController,
     KkiruScheduleController,
@@ -24,6 +27,7 @@ import { KkiruScheduleService } from './schedule/schedule.service';
   providers: [
     KkiruContractsService,
     KkiruCustomersService,
+    KkiruIncomeService,
     KkiruListingsService,
     KkiruMeetingsService,
     KkiruScheduleService,

@@ -25,9 +25,17 @@ import {
   toDecimalText,
   toManwonText,
 } from '@/lib/kkiru-format';
-
-const CONTROL_CLASS_NAME =
-  'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
+import {
+  chipClassName,
+  ERROR_BOX_CLASS_NAME,
+  FORM_SECTION_TITLE_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  INPUT_UNIT_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 
 const INFLOW_SOURCES: InflowSource[] = ['naver_land', 'instagram', 'other'];
 
@@ -173,16 +181,14 @@ function PyeongRange({
     <div className="relative w-28">
       <input
         aria-label={label}
-        className={`${CONTROL_CLASS_NAME} pr-8 text-right tabular-nums`}
+        className={`${INPUT_CLASS_NAME} pr-9 text-right tabular-nums`}
         id={field === 'pyeongMinText' ? `${idPrefix}-pyeong` : undefined}
         inputMode="decimal"
         onChange={(event) => onChange(field, toDecimalText(event.target.value))}
         required
         value={values[field]}
       />
-      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-        평
-      </span>
+      <span className={INPUT_UNIT_CLASS_NAME}>평</span>
     </div>
   );
 
@@ -251,19 +257,22 @@ export function KkiruMeetingForm({
   return (
     <form
       aria-label={isEdit ? '미팅 수정' : '새 미팅'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-8" disabled={isSubmitting}>
         <legend className="sr-only">미팅 정보</legend>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">고객</h3>
-          <FormField label="고객" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>고객</h3>
+          <FormField look="kkiru" label="고객" required>
             {isEdit ? (
-              <p className="flex h-10 items-center gap-3 text-sm">
+              <p className="flex h-11 items-center gap-3 text-[15px] font-semibold">
                 {meeting.customer.name}
-                <span className="font-mono text-xs text-[var(--muted)]">
+                <span
+                  className="font-mono text-xs font-medium text-[var(--muted)]/70"
+                  translate="no"
+                >
                   {meeting.customer.code}
                 </span>
               </p>
@@ -275,9 +284,9 @@ export function KkiruMeetingForm({
               />
             )}
           </FormField>
-          <FormField htmlFor={id('title')} label="제목" required>
+          <FormField look="kkiru" htmlFor={id('title')} label="제목" required>
             <input
-              className={CONTROL_CLASS_NAME}
+              className={INPUT_CLASS_NAME}
               id={id('title')}
               maxLength={100}
               onChange={(e) => update('title', e.target.value)}
@@ -286,11 +295,11 @@ export function KkiruMeetingForm({
               value={values.title}
             />
           </FormField>
-          <FormField htmlFor={id('meet-date')} label="미팅 일시" required>
+          <FormField look="kkiru" htmlFor={id('meet-date')} label="미팅 일시" required>
             <div className="flex flex-wrap gap-2">
               <input
                 aria-label="미팅 날짜"
-                className={`${CONTROL_CLASS_NAME} sm:w-48`}
+                className={`${INPUT_CLASS_NAME} sm:w-48`}
                 id={id('meet-date')}
                 onChange={(e) => update('meetDate', e.target.value)}
                 required
@@ -299,7 +308,7 @@ export function KkiruMeetingForm({
               />
               <input
                 aria-label="미팅 시간"
-                className={`${CONTROL_CLASS_NAME} sm:w-36`}
+                className={`${INPUT_CLASS_NAME} sm:w-36`}
                 onChange={(e) => update('meetTime', e.target.value)}
                 required
                 step={600}
@@ -308,17 +317,13 @@ export function KkiruMeetingForm({
               />
             </div>
           </FormField>
-          <FormField label="유입 경로" required>
+          <FormField look="kkiru" label="유입 경로" required>
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap gap-2">
                 {INFLOW_SOURCES.map((source) => (
                   <button
                     aria-pressed={values.inflowSource === source}
-                    className={`h-10 border px-4 text-sm ${
-                      values.inflowSource === source
-                        ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
-                        : 'border-[var(--line)] hover:bg-[var(--background)]'
-                    }`}
+                    className={chipClassName(values.inflowSource === source, 'card')}
                     key={source}
                     onClick={() => update('inflowSource', source)}
                     type="button"
@@ -330,7 +335,7 @@ export function KkiruMeetingForm({
               {values.inflowSource === 'other' ? (
                 <input
                   aria-label="기타 유입 경로"
-                  className={`${CONTROL_CLASS_NAME} sm:w-64`}
+                  className={`${INPUT_CLASS_NAME} sm:w-64`}
                   maxLength={100}
                   onChange={(e) => update('inflowSourceDetail', e.target.value)}
                   placeholder="유입 경로 직접 입력"
@@ -342,10 +347,10 @@ export function KkiruMeetingForm({
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">희망 조건</h3>
-          <FormField htmlFor={id('area')} label="관심 상권" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>희망 조건</h3>
+          <FormField look="kkiru" htmlFor={id('area')} label="관심 상권" required>
             <input
-              className={CONTROL_CLASS_NAME}
+              className={INPUT_CLASS_NAME}
               id={id('area')}
               maxLength={200}
               onChange={(e) => update('interestArea', e.target.value)}
@@ -353,9 +358,9 @@ export function KkiruMeetingForm({
               value={values.interestArea}
             />
           </FormField>
-          <FormField htmlFor={id('business')} label="희망 업종" required>
+          <FormField look="kkiru" htmlFor={id('business')} label="희망 업종" required>
             <input
-              className={CONTROL_CLASS_NAME}
+              className={INPUT_CLASS_NAME}
               id={id('business')}
               maxLength={200}
               onChange={(e) => update('desiredBusiness', e.target.value)}
@@ -363,16 +368,16 @@ export function KkiruMeetingForm({
               value={values.desiredBusiness}
             />
           </FormField>
-          <FormField htmlFor={id('pyeong')} label="희망 평수" required>
+          <FormField look="kkiru" htmlFor={id('pyeong')} label="희망 평수" required>
             <PyeongRange
               idPrefix={idPrefix}
               onChange={(field, text) => update(field, text)}
               values={values}
             />
           </FormField>
-          <FormField htmlFor={id('floor')} label="희망 층수" required>
+          <FormField look="kkiru" htmlFor={id('floor')} label="희망 층수" required>
             <input
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('floor')}
               maxLength={50}
               onChange={(e) => update('desiredFloor', e.target.value)}
@@ -384,8 +389,8 @@ export function KkiruMeetingForm({
         </section>
 
         <section className="flex flex-col gap-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">금액</h3>
-          <FormField htmlFor={id('rent')} label="희망 임대료" required>
+          <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>금액</h3>
+          <FormField look="kkiru" htmlFor={id('rent')} label="희망 임대료" required>
             <ManwonInput
               id={id('rent')}
               onChange={(text) => update('rentText', text)}
@@ -393,7 +398,7 @@ export function KkiruMeetingForm({
               value={values.rentText}
             />
           </FormField>
-          <FormField htmlFor={id('deposit')} label="최대 가용 보증금" required>
+          <FormField look="kkiru" htmlFor={id('deposit')} label="최대 가용 보증금" required>
             <ManwonInput
               id={id('deposit')}
               onChange={(text) => update('depositText', text)}
@@ -401,7 +406,7 @@ export function KkiruMeetingForm({
               value={values.depositText}
             />
           </FormField>
-          <FormField htmlFor={id('premium')} label="최대 가용 권리금" required>
+          <FormField look="kkiru" htmlFor={id('premium')} label="최대 가용 권리금" required>
             <ManwonInput
               id={id('premium')}
               onChange={(text) => update('premiumText', text)}
@@ -409,8 +414,8 @@ export function KkiruMeetingForm({
               value={values.premiumText}
             />
           </FormField>
-          <FormField label="예산">
-            <p className="flex h-10 items-center text-sm font-medium tabular-nums sm:w-56 sm:justify-end">
+          <FormField look="kkiru" label="예산">
+            <p className="flex h-11 items-center text-[15px] font-bold tabular-nums sm:w-56 sm:justify-end sm:pr-3.5">
               {formatManwon(budget)}
             </p>
           </FormField>
@@ -418,10 +423,10 @@ export function KkiruMeetingForm({
 
         {isEdit ? null : (
           <section className="flex flex-col gap-5">
-            <h3 className="text-xs font-medium text-[var(--muted)]">미팅 내용</h3>
-            <FormField htmlFor={id('content')} label="미팅 내용" required>
+            <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>미팅 내용</h3>
+            <FormField look="kkiru" htmlFor={id('content')} label="미팅 내용" required>
               <textarea
-                className={`${CONTROL_CLASS_NAME} h-auto min-h-40 resize-y py-2.5 leading-relaxed`}
+                className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-40`}
                 id={id('content')}
                 maxLength={5000}
                 onChange={(e) => update('content', e.target.value)}
@@ -435,22 +440,18 @@ export function KkiruMeetingForm({
 
       <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
           <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
+            className={SECONDARY_BUTTON_CLASS_NAME}
             href={isEdit ? `/kkiru/meetings/${meeting.code}` : '/kkiru/meetings'}
           >
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : isEdit ? '저장' : '미팅 만들기'}
           </button>
         </div>

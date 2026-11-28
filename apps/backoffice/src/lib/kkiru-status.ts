@@ -32,6 +32,18 @@ export const LISTING_STATUS_LABELS: Record<KkiruListingStatus, string> = {
   meeting: '미팅중',
 };
 
+/** 필터 칩에 보이는 순서 (진행 단계 순) */
+export const MEETING_STATUSES: KkiruMeetingStatus[] = [
+  'meeting',
+  'contracting',
+  'contracted',
+  'contract_cancelled',
+  'stopped',
+];
+
+/** 필터 칩에 보이는 순서 (진행 단계 순) */
+export const CONTRACT_STATUSES: KkiruContractStatus[] = ['contracting', 'completed', 'cancelled'];
+
 export const LISTING_STATUSES: KkiruListingStatus[] = [
   'available',
   'meeting',

@@ -11,6 +11,7 @@ const ICON_NAMES = [
   'chart-bar',
   'check',
   'chevron-down',
+  'chevron-left',
   'chevron-right',
   'chevrons-up-down',
   'clipboard-check',

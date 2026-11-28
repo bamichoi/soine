@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { KkiruError, KkiruNotice } from '@/components/kkiru-parts';
 import { AdminApiError } from '@/lib/admin-auth-api';
 
 type LoadState<T> =
@@ -18,13 +19,16 @@ type KkiruLoaderProps<T> = {
   children: (data: T, replace: (next: T) => void) => ReactNode;
 };
 
-// 상세·수정 화면 공통 불러오기. 불러오는 중·없음·오류 안내를 함께 보여 준다.
+// 상세·수정 화면 공통 불러오기. 불러오는 중·없음·오류 안내를 카드로 보여 주고, 오류에는 '다시 시도'를 둔다.
 export function KkiruLoader<T>({ loadKey, load, noun, children }: KkiruLoaderProps<T>) {
   const [state, setState] = useState<LoadState<T>>({ kind: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isActive = true;
     setState({ kind: 'loading' });
+    // reloadKey는 '다시 시도'로 같은 값을 다시 불러오기 위한 값이다.
+    void reloadKey;
 
     load(loadKey)
       .then((data) => {
@@ -45,23 +49,24 @@ export function KkiruLoader<T>({ loadKey, load, noun, children }: KkiruLoaderPro
     return () => {
       isActive = false;
     };
-  }, [load, loadKey]);
+  }, [load, loadKey, reloadKey]);
 
   const replace = useCallback((next: T) => setState({ data: next, kind: 'loaded' }), []);
 
   if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">{noun}을(를) 불러오고 있습니다.</p>;
+    return <KkiruNotice text={`${noun}을(를) 불러오고 있습니다.`} />;
   }
 
   if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 {noun}을(를) 찾을 수 없습니다.</p>;
+    return <KkiruNotice text={`해당 ${noun}을(를) 찾을 수 없습니다.`} />;
   }
 
   if (state.kind === 'error') {
     return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        {noun}을(를) 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
+      <KkiruError
+        onRetry={() => setReloadKey((key) => key + 1)}
+        text={`${noun}을(를) 불러오지 못했습니다.`}
+      />
     );
   }
 

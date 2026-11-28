@@ -54,3 +54,8 @@ export function parseDecimalText(text: string): number | null {
   const value = Number(text);
   return Number.isFinite(value) ? value : null;
 }
+
+/** 1290 → "1,290" */
+export function formatCount(count: number): string {
+  return count.toLocaleString('ko-KR');
+}

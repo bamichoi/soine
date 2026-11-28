@@ -2,7 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { AdminSessionGuard, RequireAdminService } from '../../admin-auth/admin-session.guard';
 // biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
 import { ListingDto, ListingOptionsQueryDto, ListListingsQueryDto } from './dto/listing.dto';
-import type { Listing, ListingListResponse, ListingOption } from './listings.service';
+import type {
+  Listing,
+  ListingDetail,
+  ListingListResponse,
+  ListingOption,
+} from './listings.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { KkiruListingsService } from './listings.service';
 
@@ -30,12 +35,12 @@ export class KkiruListingsController {
   }
 
   @Get(':code')
-  findOne(@Param('code') code: string): Promise<Listing> {
+  findOne(@Param('code') code: string): Promise<ListingDetail> {
     return this.listingsService.findByCode(code);
   }
 
   @Patch(':code')
-  update(@Param('code') code: string, @Body() body: ListingDto): Promise<Listing> {
+  update(@Param('code') code: string, @Body() body: ListingDto): Promise<ListingDetail> {
     return this.listingsService.update(code, body);
   }
 }

@@ -11,6 +11,9 @@ export type CustomerRef = { code: string; name: string; phone: string };
 
 export type LogRecord = { id: string; recordedOn: string; content: string; createdAt: string };
 
+/** 기록 추가·수정. listingId가 null이면 관련 매물 없음 (수정할 때는 연결을 끊는다) */
+export type MeetingRecordInput = { recordedOn: string; content: string; listingId: string | null };
+
 export type InflowSource = 'naver_land' | 'instagram' | 'other';
 
 export const INFLOW_SOURCE_LABELS: Record<InflowSource, string> = {
@@ -30,7 +33,11 @@ export const MEETING_RECORD_KIND_LABELS: Record<MeetingRecordKind, string | null
   stopped: '진행중단 사유',
 };
 
-export type MeetingRecord = LogRecord & { kind: MeetingRecordKind };
+export type MeetingRecord = LogRecord & {
+  kind: MeetingRecordKind;
+  /** 관련 매물 (선택) */
+  listing: { id: string; code: string; name: string } | null;
+};
 
 export type MeetingSummary = {
   id: string;
@@ -187,13 +194,10 @@ export const createMeeting = (input: CreateMeetingInput) =>
   sendJson<MeetingDetail>(MEETINGS, 'POST', input);
 export const updateMeeting = (code: string, input: MeetingFieldsInput) =>
   sendJson<MeetingDetail>(meetingPath(code), 'PATCH', input);
-export const addMeetingRecord = (code: string, input: { recordedOn: string; content: string }) =>
+export const addMeetingRecord = (code: string, input: MeetingRecordInput) =>
   sendJson<MeetingDetail>(`${meetingPath(code)}/records`, 'POST', input);
-export const updateMeetingRecord = (
-  code: string,
-  recordId: string,
-  input: { recordedOn: string; content: string },
-) => sendJson<MeetingDetail>(`${meetingPath(code)}/records/${recordId}`, 'PATCH', input);
+export const updateMeetingRecord = (code: string, recordId: string, input: MeetingRecordInput) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/records/${recordId}`, 'PATCH', input);
 export const addMeetingListing = (code: string, listingId: string) =>
   sendJson<MeetingDetail>(`${meetingPath(code)}/listings`, 'POST', { listingId });
 /** 미팅 매물 빼기: 미팅과 매물의 연결만 끊는다. 계약이 걸린 매물은 뺄 수 없다(409). */

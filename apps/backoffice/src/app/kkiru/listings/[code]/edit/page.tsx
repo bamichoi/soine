@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { KkiruListingEdit } from '@/components/kkiru-listing-detail';
-import { PageTitleBar } from '@/components/page-title-bar';
+import { KkiruPageHead } from '@/components/kkiru-parts';
 import { parseRouteCode } from '@/lib/kkiru-route';
 
 export const metadata: Metadata = {
@@ -22,8 +22,8 @@ export default async function KkiruListingEditPage({
   return (
     <div className="p-4 md:p-8">
       <h1 className="sr-only">매물</h1>
-      <div className="flex max-w-3xl flex-col gap-4">
-        <PageTitleBar title="매물 수정" />
+      <div className="max-w-4xl">
+        <KkiruPageHead title="매물 수정" />
         <KkiruListingEdit code={code} />
       </div>
     </div>

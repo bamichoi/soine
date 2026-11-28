@@ -11,7 +11,7 @@ const COLUMNS: ListColumn<KkiruCustomerSummary>[] = [
   {
     key: 'name',
     label: '이름',
-    render: (c) => <span className="whitespace-nowrap">{c.name}</span>,
+    render: (c) => <span className="font-semibold whitespace-nowrap">{c.name}</span>,
     sortField: 'name',
   },
   {
@@ -48,6 +48,7 @@ export function KkiruCustomerTable() {
       defaultSort={{ field: 'createdAt', order: 'desc' }}
       emptyText="아직 등록된 고객이 없습니다."
       load={listKkiruCustomers}
+      look="kkiru"
       minWidth="40rem"
       rowLink={(c) => ({
         extra: <CopyCodeButton code={c.code} label="고객 번호" />,

@@ -48,6 +48,8 @@ export type MeetingRecord = {
   kind: KkiruMeetingRecordKind;
   recordedOn: string;
   content: string;
+  /** 관련 매물 (선택) */
+  listing: { id: string; code: string; name: string } | null;
   createdAt: string;
 };
 
@@ -104,6 +106,11 @@ const RECORD_ORDER = [
   { createdAt: 'asc' },
 ] satisfies Prisma.KkiruMeetingRecordOrderByWithRelationInput[];
 
+/** 미팅 기록을 읽을 때 함께 가져올 관련 매물 */
+export const RECORD_INCLUDE = {
+  listing: { select: { code: true, id: true, name: true } },
+} satisfies Prisma.KkiruMeetingRecordInclude;
+
 const DETAIL_INCLUDE = {
   contracts: {
     orderBy: [{ createdAt: 'desc' }],
@@ -116,7 +123,7 @@ const DETAIL_INCLUDE = {
   },
   customer: true,
   listings: { include: { listing: true }, orderBy: { createdAt: 'asc' } },
-  records: { orderBy: RECORD_ORDER },
+  records: { include: RECORD_INCLUDE, orderBy: RECORD_ORDER },
 } satisfies Prisma.KkiruMeetingInclude;
 
 type MeetingWithDetail = Prisma.KkiruMeetingGetPayload<{ include: typeof DETAIL_INCLUDE }>;
@@ -127,12 +134,16 @@ export function toMeetingRecord(record: {
   recordedOn: Date;
   content: string;
   createdAt: Date;
+  listing: { id: string; code: string; name: string } | null;
 }): MeetingRecord {
   return {
     content: record.content,
     createdAt: record.createdAt.toISOString(),
     id: record.id,
     kind: record.kind,
+    listing: record.listing
+      ? { code: record.listing.code, id: record.listing.id, name: record.listing.name }
+      : null,
     recordedOn: toDateString(record.recordedOn),
   };
 }
@@ -352,11 +363,17 @@ export class KkiruMeetingsService {
 
   async addRecord(rawCode: string, input: LogRecordDto): Promise<MeetingDetail> {
     const meeting = await this.requireMeeting(rawCode);
+    const listingId = input.listingId ?? null;
+
+    if (listingId) {
+      await this.requireMeetingListing(meeting.id, listingId);
+    }
 
     await this.prisma.kkiruMeetingRecord.create({
       data: {
         content: input.content,
         kind: 'note',
+        listingId,
         meetingId: meeting.id,
         recordedOn: toDateOnly(input.recordedOn),
       },
@@ -365,21 +382,38 @@ export class KkiruMeetingsService {
     return this.findByCode(meeting.code);
   }
 
-  /** 로그 기록을 고친다. 기록은 지우지 않는다. */
+  /**
+   * 로그 기록을 고친다. 기록은 지우지 않는다.
+   * 관련 매물은 null이면 끊고, 보내지 않으면 그대로 둔다. 새로 고르는 매물은 미팅 매물이어야 하고,
+   * 이미 연결된 매물은 그사이 미팅 매물에서 빠졌어도 그대로 둘 수 있다.
+   */
   async updateRecord(
     rawCode: string,
     recordId: string,
     input: LogRecordDto,
   ): Promise<MeetingDetail> {
     const meeting = await this.requireMeeting(rawCode);
-    const { count } = await this.prisma.kkiruMeetingRecord.updateMany({
-      data: { content: input.content, recordedOn: toDateOnly(input.recordedOn) },
+    const record = await this.prisma.kkiruMeetingRecord.findFirst({
+      select: { listingId: true },
       where: { id: recordId, meetingId: meeting.id },
     });
 
-    if (count === 0) {
+    if (!record) {
       throw new NotFoundException('Record not found');
     }
+
+    if (input.listingId && input.listingId !== record.listingId) {
+      await this.requireMeetingListing(meeting.id, input.listingId);
+    }
+
+    await this.prisma.kkiruMeetingRecord.update({
+      data: {
+        content: input.content,
+        recordedOn: toDateOnly(input.recordedOn),
+        ...(input.listingId === undefined ? {} : { listingId: input.listingId }),
+      },
+      where: { id: recordId },
+    });
 
     return this.findByCode(meeting.code);
   }
@@ -425,7 +459,10 @@ export class KkiruMeetingsService {
     return this.findByCode(meeting.code);
   }
 
-  /** 잘못 더한 미팅 매물을 뺀다. 연결만 끊고 매물은 그대로 둔다. 계약이 걸린 매물은 뺄 수 없다. */
+  /**
+   * 잘못 더한 미팅 매물을 뺀다. 연결만 끊고 매물은 그대로 둔다. 계약이 걸린 매물은 뺄 수 없다.
+   * 이 매물을 관련 매물로 남긴 기록은 이력이므로 연결을 그대로 둔다.
+   */
   async removeListing(rawCode: string, listingId: string): Promise<MeetingDetail> {
     const meeting = await this.requireMeeting(rawCode);
 
@@ -504,6 +541,19 @@ export class KkiruMeetingsService {
     });
 
     return this.findByCode(meeting.code);
+  }
+
+  /** 관련 매물은 그 미팅의 미팅 매물이어야 한다. */
+  private async requireMeetingListing(meetingId: string, listingId: string): Promise<void> {
+    const link = await this.prisma.kkiruMeetingListing.findUnique({
+      select: { listingId: true },
+      // biome-ignore lint/style/useNamingConvention: Prisma compound key name.
+      where: { meetingId_listingId: { listingId, meetingId } },
+    });
+
+    if (!link) {
+      throw new BadRequestException('Listing is not in this meeting');
+    }
   }
 
   private async requireMeeting(rawCode: string): Promise<{ id: string; code: string }> {

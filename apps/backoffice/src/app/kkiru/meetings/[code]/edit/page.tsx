@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { BackToListLink } from '@/components/back-to-list-link';
 import { KkiruMeetingEdit } from '@/components/kkiru-meeting-pages';
-import { PageTitleBar } from '@/components/page-title-bar';
+import { KkiruPageHead } from '@/components/kkiru-parts';
 import { parseRouteCode } from '@/lib/kkiru-route';
 
 export const metadata: Metadata = {
@@ -25,8 +25,11 @@ export default async function KkiruMeetingEditPage({
     <div className="p-4 md:p-8">
       <h1 className="sr-only">미팅</h1>
       <Suspense>
-        <div className="flex max-w-3xl flex-col gap-4">
-          <PageTitleBar actions={<BackToListLink href="/kkiru/meetings" />} title="미팅 수정" />
+        <div className="max-w-4xl">
+          <div className="mb-2 md:hidden">
+            <BackToListLink href="/kkiru/meetings" />
+          </div>
+          <KkiruPageHead title="미팅 수정" />
           <KkiruMeetingEdit code={value} />
         </div>
       </Suspense>

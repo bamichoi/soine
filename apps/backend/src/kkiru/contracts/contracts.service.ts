@@ -23,7 +23,7 @@ import {
   syncMeetingAndListings,
 } from '../common/status-sync';
 import { type ListingOption, toListingOption } from '../listings/listings.service';
-import { type MeetingRecord, toMeetingRecord } from '../meetings/meetings.service';
+import { type MeetingRecord, RECORD_INCLUDE, toMeetingRecord } from '../meetings/meetings.service';
 import {
   BALANCE_DUE_BEFORE_CONTRACT_MESSAGE,
   type ContractFieldsDto,
@@ -86,7 +86,10 @@ const DETAIL_INCLUDE = {
   meeting: {
     include: {
       customer: true,
-      records: { orderBy: [{ recordedOn: 'asc' as const }, { createdAt: 'asc' as const }] },
+      records: {
+        include: RECORD_INCLUDE,
+        orderBy: [{ recordedOn: 'asc' as const }, { createdAt: 'asc' as const }],
+      },
     },
   },
 } satisfies Prisma.KkiruContractInclude;

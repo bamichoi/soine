@@ -5,6 +5,7 @@ import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
 import { formatArea, formatManwon } from '@/lib/kkiru-format';
 import { type KkiruListingOption, searchKkiruListingOptions } from '@/lib/kkiru-listings-api';
 import { type KkiruListingStatus, LISTING_STATUS_LABELS } from '@/lib/kkiru-status';
+import { FAINT_CLASS_NAME, FOCUS_CLASS_NAME, INPUT_CLASS_NAME } from '@/lib/kkiru-ui';
 
 type KkiruListingPickerProps = {
   /** 고르기 쉬운 후보 (예: 미팅 매물) */
@@ -35,17 +36,22 @@ function ListingRow({
     <li>
       <button
         aria-pressed={selected}
-        className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-          selected ? 'bg-[var(--brand-soft)]' : 'hover:bg-[var(--background)]'
-        }`}
+        className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+          selected ? 'bg-[var(--brand-soft)]' : 'hover:bg-[var(--surface)]'
+        } ${FOCUS_CLASS_NAME}`}
         disabled={disabled}
         onClick={onPick}
         type="button"
       >
-        <span className="w-24 shrink-0 font-mono text-[13px]">{listing.code}</span>
+        <span
+          className={`hidden w-24 shrink-0 font-mono text-xs font-medium sm:block ${FAINT_CLASS_NAME}`}
+          translate="no"
+        >
+          {listing.code}
+        </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium">{listing.name}</span>
-          <span className="truncate text-xs text-[var(--muted)]">
+          <span className="truncate font-bold">{listing.name}</span>
+          <span className="truncate text-xs text-[var(--muted)] tabular-nums">
             {listing.address} · {formatArea(listing.areaM2)} · {listing.floor} · 보증금{' '}
             {formatManwon(listing.deposit)} / 월 {formatManwon(listing.rent)}
           </span>
@@ -109,7 +115,7 @@ export function KkiruListingPicker({
     <div className="flex flex-col gap-2">
       <input
         aria-label="매물 검색"
-        className="h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)]"
+        className={INPUT_CLASS_NAME}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="매물 번호, 이름, 주소로 검색"
         type="search"
@@ -124,7 +130,7 @@ export function KkiruListingPicker({
         </p>
       ) : null}
       {shown.length > 0 ? (
-        <ul className="flex max-h-72 flex-col divide-y divide-[var(--line)] overflow-y-auto border border-[var(--line)]">
+        <ul className="flex max-h-72 flex-col gap-0.5 overflow-y-auto rounded-xl bg-[var(--background)] p-1">
           {shown.map((listing) => {
             const isBlocked = disabledStatuses.includes(listing.status);
 

@@ -5,6 +5,7 @@ import { Icon } from '@/components/icon';
 import { KkiruCustomerAddDialog } from '@/components/kkiru-customer-add-dialog';
 import { KkiruCustomerSearchDialog } from '@/components/kkiru-customer-search-dialog';
 import { getKkiruCustomer } from '@/lib/kkiru-customers-api';
+import { SECONDARY_BUTTON_CLASS_NAME } from '@/lib/kkiru-ui';
 import { formatPhone } from '@/lib/phone';
 
 export type PickedCustomer = { code: string; name: string; phone: string };
@@ -16,15 +17,16 @@ type KkiruCustomerPickerProps = {
   initialCode?: string | null;
 };
 
-const ACTION_BUTTON_CLASS_NAME =
-  'inline-flex h-10 items-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-medium hover:bg-[var(--background)]';
+const ACTION_BUTTON_CLASS_NAME = `${SECONDARY_BUTTON_CLASS_NAME} h-11`;
 
 /** 고른 고객의 이름·연락처를 보여 주는 칸. 직접 입력하지 않는다. */
 function ValueBox({ label, value }: { label: string; value: string | null }) {
   return (
     <div
-      className={`flex h-10 min-w-0 flex-1 items-center border border-[var(--line)] px-3 text-sm sm:max-w-56 ${
-        value ? 'bg-[var(--surface)]' : 'bg-[var(--background)] text-[var(--muted)]'
+      className={`flex h-11 min-w-0 flex-1 items-center rounded-xl px-3.5 text-[15px] sm:max-w-56 ${
+        value
+          ? 'bg-[var(--brand-soft)] font-semibold'
+          : 'bg-[var(--background)] text-[var(--muted)]/70'
       }`}
     >
       {value ? <span className="sr-only">{label}: </span> : null}
@@ -96,7 +98,10 @@ export function KkiruCustomerPicker({ value, onChange, initialCode }: KkiruCusto
       </div>
       {value ? (
         <p className="text-xs text-[var(--muted)]">
-          고객 번호 <span className="font-mono">{value.code}</span>
+          고객 번호{' '}
+          <span className="font-mono" translate="no">
+            {value.code}
+          </span>
         </p>
       ) : null}
       {message ? <p className="text-xs text-[var(--error)]">{message}</p> : null}

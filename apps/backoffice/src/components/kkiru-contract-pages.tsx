@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { CopyCodeButton } from '@/components/copy-code-button';
 import { KkiruContractForm } from '@/components/kkiru-contract-form';
 import { KkiruLoader } from '@/components/kkiru-loader';
+import { KkiruNotice } from '@/components/kkiru-parts';
 import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
 import { type ListColumn, ListTable } from '@/components/list-table';
 import { formatInquiryDate } from '@/lib/choidolsang-inquiries-api';
@@ -15,7 +16,7 @@ import {
 } from '@/lib/kkiru-cases-api';
 import { formatManwon } from '@/lib/kkiru-format';
 import { parseRouteCode } from '@/lib/kkiru-route';
-import { CONTRACT_STATUS_LABELS, type KkiruContractStatus } from '@/lib/kkiru-status';
+import { CONTRACT_STATUS_LABELS, CONTRACT_STATUSES } from '@/lib/kkiru-status';
 
 const COLUMNS: ListColumn<ContractSummary>[] = [
   { key: 'case', label: '케이스 번호', render: () => null },
@@ -30,14 +31,14 @@ const COLUMNS: ListColumn<ContractSummary>[] = [
     key: 'customer',
     sortField: 'customer',
     label: '임차인',
-    render: (c) => <span className="whitespace-nowrap">{c.customer.name}</span>,
+    render: (c) => <span className="font-semibold whitespace-nowrap">{c.customer.name}</span>,
   },
   {
     key: 'listing',
     sortField: 'listing',
     label: '대상 매물',
     render: (c) => (
-      <p className="max-w-[22rem] truncate" title={c.listing.name}>
+      <p className="max-w-[22rem] truncate text-[var(--muted)]" title={c.listing.name}>
         {c.listing.name}
       </p>
     ),
@@ -48,7 +49,7 @@ const COLUMNS: ListColumn<ContractSummary>[] = [
     key: 'commission',
     sortField: 'commission',
     label: '수수료',
-    render: (c) => formatManwon(c.commission),
+    render: (c) => <span className="font-bold">{formatManwon(c.commission)}</span>,
   },
   {
     align: 'right',
@@ -73,12 +74,10 @@ const COLUMNS: ListColumn<ContractSummary>[] = [
   },
 ];
 
-const STATUS_OPTIONS = (Object.keys(CONTRACT_STATUS_LABELS) as KkiruContractStatus[]).map(
-  (value) => ({
-    label: CONTRACT_STATUS_LABELS[value],
-    value,
-  }),
-);
+const STATUS_OPTIONS = CONTRACT_STATUSES.map((value) => ({
+  label: CONTRACT_STATUS_LABELS[value],
+  value,
+}));
 
 export function KkiruContractTable() {
   return (
@@ -86,6 +85,7 @@ export function KkiruContractTable() {
       columns={COLUMNS}
       emptyText="아직 계약이 없습니다. 미팅 상세에서 계약 진행을 눌러 만들어 주세요."
       load={listContracts}
+      look="kkiru"
       minWidth="68rem"
       rowLink={(c) => ({
         extra: <CopyCodeButton code={c.caseCode} label="케이스 번호" />,
@@ -113,11 +113,7 @@ export function KkiruNewContract() {
   const listingCode = parseRouteCode(searchParams.get('listing') ?? '');
 
   if (!meetingCode) {
-    return (
-      <p className="py-10 text-sm text-[var(--muted)]">
-        계약은 미팅 상세의 계약 진행에서 만들 수 있습니다.
-      </p>
-    );
+    return <KkiruNotice text="계약은 미팅 상세의 계약 진행에서 만들 수 있습니다." />;
   }
 
   return (
@@ -126,9 +122,7 @@ export function KkiruNewContract() {
         meeting.canStartContract ? (
           <KkiruContractForm initialListingCode={listingCode} meeting={meeting} mode="create" />
         ) : (
-          <p className="py-10 text-sm text-[var(--muted)]">
-            이 미팅은 지금 계약을 만들 수 없는 상태입니다.
-          </p>
+          <KkiruNotice text="이 미팅은 지금 계약을 만들 수 없는 상태입니다." />
         )
       }
     </KkiruLoader>
@@ -142,7 +136,7 @@ export function KkiruContractEdit({ id }: { id: string }) {
         contract.status === 'contracting' ? (
           <KkiruContractForm contract={contract} mode="edit" />
         ) : (
-          <p className="py-10 text-sm text-[var(--muted)]">계약예정인 계약만 고칠 수 있습니다.</p>
+          <KkiruNotice text="계약예정인 계약만 고칠 수 있습니다." />
         )
       }
     </KkiruLoader>

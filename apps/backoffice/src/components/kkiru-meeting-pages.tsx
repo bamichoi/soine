@@ -9,7 +9,7 @@ import { type ListColumn, ListTable } from '@/components/list-table';
 import { formatSeoulDateTime } from '@/lib/choidolsang-inquiries-api';
 import { getMeeting, listMeetings, type MeetingSummary } from '@/lib/kkiru-cases-api';
 import { formatManwon } from '@/lib/kkiru-format';
-import { type KkiruMeetingStatus, MEETING_STATUS_LABELS } from '@/lib/kkiru-status';
+import { MEETING_STATUS_LABELS, MEETING_STATUSES } from '@/lib/kkiru-status';
 import { formatPhone } from '@/lib/phone';
 
 const COLUMNS: ListColumn<MeetingSummary>[] = [
@@ -28,7 +28,7 @@ const COLUMNS: ListColumn<MeetingSummary>[] = [
     sortField: 'title',
     label: '제목',
     render: (c) => (
-      <p className="max-w-[22rem] truncate" title={c.title}>
+      <p className="max-w-[22rem] truncate font-semibold" title={c.title}>
         {c.title}
       </p>
     ),
@@ -37,7 +37,7 @@ const COLUMNS: ListColumn<MeetingSummary>[] = [
     key: 'customer',
     sortField: 'customer',
     label: '고객',
-    render: (c) => <span className="whitespace-nowrap">{c.customer.name}</span>,
+    render: (c) => <span className="font-semibold whitespace-nowrap">{c.customer.name}</span>,
   },
   {
     key: 'phone',
@@ -62,7 +62,7 @@ const COLUMNS: ListColumn<MeetingSummary>[] = [
     align: 'right',
     key: 'budget',
     label: '예산',
-    render: (c) => formatManwon(c.budget),
+    render: (c) => <span className="font-bold">{formatManwon(c.budget)}</span>,
   },
   {
     key: 'status',
@@ -72,12 +72,10 @@ const COLUMNS: ListColumn<MeetingSummary>[] = [
   },
 ];
 
-const STATUS_OPTIONS = (Object.keys(MEETING_STATUS_LABELS) as KkiruMeetingStatus[]).map(
-  (value) => ({
-    label: MEETING_STATUS_LABELS[value],
-    value,
-  }),
-);
+const STATUS_OPTIONS = MEETING_STATUSES.map((value) => ({
+  label: MEETING_STATUS_LABELS[value],
+  value,
+}));
 
 export function KkiruMeetingTable() {
   return (
@@ -86,6 +84,7 @@ export function KkiruMeetingTable() {
       columns={COLUMNS}
       emptyText="아직 미팅이 없습니다."
       load={listMeetings}
+      look="kkiru"
       minWidth="68rem"
       rowLink={(c) => ({
         extra: <CopyCodeButton code={c.code} label="케이스 번호" />,

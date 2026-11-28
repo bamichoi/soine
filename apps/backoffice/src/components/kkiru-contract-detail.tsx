@@ -3,8 +3,16 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { CodeHeader, InfoItem, SectionTitle } from '@/components/kkiru-detail-parts';
+import {
+  InfoGroup,
+  InfoItem,
+  InfoLink,
+  InfoSheet,
+  InfoTextGroup,
+  KkiruDetailHead,
+} from '@/components/kkiru-detail-parts';
 import { KkiruLoader } from '@/components/kkiru-loader';
+import { KkiruLogPanel } from '@/components/kkiru-log-panel';
 import { PhoneNumber } from '@/components/phone-number';
 import { ReasonDialog } from '@/components/reason-dialog';
 import { AdminApiError } from '@/lib/admin-auth-api';
@@ -18,41 +26,13 @@ import {
 } from '@/lib/kkiru-cases-api';
 import { formatArea, formatManwon } from '@/lib/kkiru-format';
 import { CONTRACT_STATUS_LABELS } from '@/lib/kkiru-status';
-import { PRIMARY_BUTTON_CLASS_NAME, SECONDARY_BUTTON_CLASS_NAME } from '@/lib/kkiru-ui';
+import {
+  DANGER_BUTTON_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 
-const LINK_CHIP_CLASS_NAME =
-  'flex h-7 items-center border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]';
-
-function ContractHistory({ contract }: { contract: ContractDetail }) {
-  return (
-    <section
-      aria-label="계약 히스토리"
-      className="flex flex-col gap-3 bg-[var(--background)] px-5 py-4"
-    >
-      <SectionTitle>계약 히스토리 (미팅 기록)</SectionTitle>
-      <ol className="flex flex-col divide-y divide-[var(--line)]">
-        {contract.history.map((entry) => {
-          const kindLabel = MEETING_RECORD_KIND_LABELS[entry.kind];
-
-          return (
-            <li className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0" key={entry.id}>
-              <span className="flex flex-wrap items-center gap-2 text-[11px]">
-                {kindLabel ? (
-                  <span className="font-medium text-[var(--warning)]">{kindLabel}</span>
-                ) : null}
-                <span className="text-[var(--muted)] tabular-nums">
-                  {formatInquiryDate(entry.recordedOn)}
-                </span>
-              </span>
-              <p className="text-sm leading-6 break-words whitespace-pre-wrap">{entry.content}</p>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
+/** 제목 줄 오른쪽 버튼. 계약예정일 때만 [수정][계약 취소][계약 완료]를 더한다. */
 function ContractActions({
   contract,
   onChange,
@@ -61,63 +41,69 @@ function ContractActions({
   onChange: (next: ContractDetail) => void;
 }) {
   const [dialog, setDialog] = useState<'complete' | 'cancel' | null>(null);
-
-  if (contract.status !== 'contracting') {
-    return null;
-  }
+  const isContracting = contract.status === 'contracting';
 
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
-      <Link className={SECONDARY_BUTTON_CLASS_NAME} href={`/kkiru/contracts/${contract.id}/edit`}>
-        수정
+    <>
+      <Link className={SECONDARY_BUTTON_CLASS_NAME} href={`/kkiru/meetings/${contract.caseCode}`}>
+        미팅 기록
       </Link>
-      <div className="flex gap-2">
-        <button
-          className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
-          onClick={() => setDialog('cancel')}
-          type="button"
-        >
-          계약 취소
-        </button>
-        <button
-          className={PRIMARY_BUTTON_CLASS_NAME}
-          onClick={() => setDialog('complete')}
-          type="button"
-        >
-          계약 완료
-        </button>
-      </div>
+      {isContracting ? (
+        <>
+          <Link
+            className={SECONDARY_BUTTON_CLASS_NAME}
+            href={`/kkiru/contracts/${contract.id}/edit`}
+          >
+            수정
+          </Link>
+          <button
+            className={DANGER_BUTTON_CLASS_NAME}
+            onClick={() => setDialog('cancel')}
+            type="button"
+          >
+            계약 취소
+          </button>
+          <button
+            className={PRIMARY_BUTTON_CLASS_NAME}
+            onClick={() => setDialog('complete')}
+            type="button"
+          >
+            계약 완료
+          </button>
 
-      <ReasonDialog
-        confirmLabel="계약 취소"
-        isOpen={dialog === 'cancel'}
-        label="취소 사유"
-        onClose={() => setDialog(null)}
-        onConfirm={async (reason) => {
-          onChange(await cancelContract(contract.id, reason));
-          setDialog(null);
-        }}
-        title="계약 취소"
-        tone="danger"
-      />
-      <ConfirmDialog
-        confirmLabel="계약 완료"
-        getErrorMessage={(error) =>
-          error instanceof AdminApiError && error.status === 409
-            ? '이미 처리된 계약입니다. 화면을 새로고침해 주세요.'
-            : '계약 완료로 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
-        }
-        isOpen={dialog === 'complete'}
-        message="계약을 완료로 바꾸면 미팅과 매물이 계약완료로 바뀝니다. 되돌릴 수 없습니다."
-        onClose={() => setDialog(null)}
-        onConfirm={async () => {
-          onChange(await completeContract(contract.id));
-          setDialog(null);
-        }}
-        pendingLabel="처리 중..."
-        title="계약 완료"
-      />
-    </footer>
+          <ReasonDialog
+            confirmLabel="계약 취소"
+            isOpen={dialog === 'cancel'}
+            label="취소 사유"
+            onClose={() => setDialog(null)}
+            onConfirm={async (reason) => {
+              onChange(await cancelContract(contract.id, reason));
+              setDialog(null);
+            }}
+            title="계약 취소"
+            tone="danger"
+          />
+          <ConfirmDialog
+            confirmLabel="계약 완료"
+            getErrorMessage={(error) =>
+              error instanceof AdminApiError && error.status === 409
+                ? '이미 처리된 계약입니다. 화면을 새로고침해 주세요.'
+                : '계약 완료로 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
+            }
+            isOpen={dialog === 'complete'}
+            look="kkiru"
+            message="계약을 완료로 바꾸면 미팅과 매물이 계약완료로 바뀝니다. 되돌릴 수 없습니다."
+            onClose={() => setDialog(null)}
+            onConfirm={async () => {
+              onChange(await completeContract(contract.id));
+              setDialog(null);
+            }}
+            pendingLabel="처리 중..."
+            title="계약 완료"
+          />
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -131,91 +117,99 @@ function ContractBody({
   const { listing } = contract;
 
   return (
-    <article className="flex flex-col border border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex flex-col gap-6 p-6">
-        <CodeHeader
-          code={contract.caseCode}
-          label="케이스 번호"
-          status={contract.status}
-          statusLabel={CONTRACT_STATUS_LABELS[contract.status]}
-        >
-          <Link className={LINK_CHIP_CLASS_NAME} href={`/kkiru/meetings/${contract.caseCode}`}>
-            미팅 기록
-          </Link>
-        </CodeHeader>
+    <article>
+      <KkiruDetailHead
+        actions={<ContractActions contract={contract} onChange={onChange} />}
+        code={contract.caseCode}
+        codeLabel="케이스"
+        copyLabel="케이스 번호"
+        status={{ label: CONTRACT_STATUS_LABELS[contract.status], value: contract.status }}
+        title={listing.name}
+      />
 
+      <InfoSheet label="계약 정보">
         {contract.status === 'cancelled' && contract.cancelReason ? (
-          <section
-            aria-label="취소 사유"
-            className="flex flex-col gap-1 bg-[var(--error-soft)] px-5 py-4"
-          >
-            <h3 className="text-xs font-medium text-[var(--error)]">계약취소 사유</h3>
-            <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-              {contract.cancelReason}
-            </p>
-          </section>
+          <InfoTextGroup
+            text={contract.cancelReason}
+            title="취소 사유"
+            titleClassName="text-[var(--error)]"
+          />
         ) : null}
-
-        <section aria-label="대상 매물" className="flex flex-col gap-2">
-          <SectionTitle>대상 매물</SectionTitle>
-          <Link
-            className="flex flex-col gap-1 border border-[var(--line)] px-4 py-3 text-sm hover:bg-[var(--background)]"
-            href={`/kkiru/listings/${listing.code}`}
-          >
-            <span className="flex items-center gap-2">
-              <span className="font-mono text-[13px]">{listing.code}</span>
-              <span className="font-medium">{listing.name}</span>
-            </span>
-            <span className="text-xs text-[var(--muted)]">
-              {listing.address} · {formatArea(listing.areaM2)} · {listing.floor}
-            </span>
-          </Link>
-        </section>
-
-        <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-3">
-          <InfoItem label="계약 일자">{formatInquiryDate(contract.contractedOn)}</InfoItem>
+        <InfoGroup title="당사자">
           <InfoItem label="임차인">
-            <Link
-              className="text-[var(--brand)] underline-offset-2 hover:underline"
-              href={`/kkiru/customers/${contract.customer.code}`}
-            >
+            <InfoLink href={`/kkiru/customers/${contract.customer.code}`}>
               {contract.customer.name}
-            </Link>{' '}
-            <PhoneNumber className="text-[var(--muted)]" phone={contract.customer.phone} />
+            </InfoLink>
           </InfoItem>
-          <InfoItem label="임대인">
-            {contract.landlordName}{' '}
-            <PhoneNumber className="text-[var(--muted)]" phone={contract.landlordPhone} />
+          <InfoItem label="임차인 연락처">
+            <PhoneNumber phone={contract.customer.phone} />
           </InfoItem>
-          <InfoItem label="보증금">{formatManwon(contract.deposit)}</InfoItem>
-          <InfoItem label="임대료">{formatManwon(contract.rent)}</InfoItem>
-          <InfoItem label="권리금">{formatManwon(contract.premium)}</InfoItem>
+          <InfoItem label="임대인">{contract.landlordName}</InfoItem>
+          <InfoItem label="임대인 연락처">
+            <PhoneNumber phone={contract.landlordPhone} />
+          </InfoItem>
+        </InfoGroup>
+        <InfoGroup title="대상 매물">
+          <InfoItem label="매물 번호">
+            <InfoLink href={`/kkiru/listings/${listing.code}`}>
+              <span className="font-mono" translate="no">
+                {listing.code}
+              </span>
+            </InfoLink>
+          </InfoItem>
+          <InfoItem className="md:col-span-2" label="주소">
+            {listing.address}
+          </InfoItem>
+          <InfoItem label="면적·층수" sub={listing.floor}>
+            <span className="tabular-nums">{formatArea(listing.areaM2)}</span>
+          </InfoItem>
+        </InfoGroup>
+        <InfoGroup title="임대 조건">
+          <InfoItem isMoney label="보증금">
+            {formatManwon(contract.deposit)}
+          </InfoItem>
+          <InfoItem isMoney label="임대료">
+            월 {formatManwon(contract.rent)}
+          </InfoItem>
+          <InfoItem isMoney label="권리금">
+            {formatManwon(contract.premium)}
+          </InfoItem>
           <InfoItem label="임대차 기간">
-            {formatInquiryDate(contract.leaseStartOn)} ~ {formatInquiryDate(contract.leaseEndOn)}
+            <span className="tabular-nums">
+              {formatInquiryDate(contract.leaseStartOn)} ~ {formatInquiryDate(contract.leaseEndOn)}
+            </span>
           </InfoItem>
-          <InfoItem label="계약금">{formatManwon(contract.downPayment)}</InfoItem>
-          <InfoItem label="잔금">{formatManwon(contract.balance)}</InfoItem>
-          <InfoItem label="잔금일">{formatInquiryDate(contract.balanceDueOn)}</InfoItem>
-          <InfoItem label="수수료">
-            <span className="font-semibold">{formatManwon(contract.commission)}</span>
+        </InfoGroup>
+        <InfoGroup title="일정·금액">
+          <InfoItem label="계약 일자">
+            <span className="tabular-nums">{formatInquiryDate(contract.contractedOn)}</span>
+          </InfoItem>
+          <InfoItem isMoney label="계약금">
+            {formatManwon(contract.downPayment)}
+          </InfoItem>
+          <InfoItem isMoney label="잔금">
+            {formatManwon(contract.balance)}
+          </InfoItem>
+          <InfoItem label="잔금일">
+            <span className="tabular-nums">{formatInquiryDate(contract.balanceDueOn)}</span>
+          </InfoItem>
+          <InfoItem isMoney label="수수료">
+            {formatManwon(contract.commission)}
           </InfoItem>
           <InfoItem label="내 매물">{contract.isMyListing ? '예' : '아니오'}</InfoItem>
           <InfoItem label="내 손님">{contract.isMyClient ? '예' : '아니오'}</InfoItem>
-        </dl>
+        </InfoGroup>
+        <InfoTextGroup text={contract.specialTerms} title="특약 사항" />
+      </InfoSheet>
 
-        <section
-          aria-label="특약 사항"
-          className="flex flex-col gap-2 border-t border-[var(--line)] pt-5"
-        >
-          <SectionTitle>특약 사항</SectionTitle>
-          <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-            {contract.specialTerms ?? <span className="text-[var(--muted)]">없음</span>}
-          </p>
-        </section>
-
-        <ContractHistory contract={contract} />
-      </div>
-      <ContractActions contract={contract} onChange={onChange} />
+      {/* 계약 히스토리는 이 계약이 속한 미팅의 기록이다. 여기서는 읽기만 한다. */}
+      <KkiruLogPanel
+        entries={contract.history.map((entry) => ({
+          ...entry,
+          label: MEETING_RECORD_KIND_LABELS[entry.kind],
+        }))}
+        title="계약 히스토리"
+      />
     </article>
   );
 }

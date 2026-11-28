@@ -13,6 +13,12 @@ export type FakeListing = {
 };
 export type FakeContract = { id: string; meetingId: string; listingId: string; status: string };
 export type FakeLink = { meetingId: string; listingId: string };
+export type FakeRecord = {
+  id: string;
+  meetingId: string;
+  content: string;
+  listingId: string | null;
+};
 
 type Where = Record<string, unknown>;
 
@@ -31,6 +37,7 @@ export function createFakeKkiruDb(seed: {
   listings?: FakeListing[];
   contracts?: FakeContract[];
   links?: FakeLink[];
+  records?: FakeRecord[];
 }) {
   const db = {
     contracts: (seed.contracts ?? []).map((row) => ({ ...row })) as (FakeContract & Row)[],
@@ -38,7 +45,7 @@ export function createFakeKkiruDb(seed: {
     listings: (seed.listings ?? []).map((row) => ({ ...row })) as (FakeListing & Row)[],
     locks: [] as string[],
     meetings: (seed.meetings ?? []).map((row) => ({ ...row })) as (FakeMeeting & Row)[],
-    records: [] as Row[],
+    records: (seed.records ?? []).map((row) => ({ ...row })) as Row[],
   };
 
   const meetingById = (id: string) => db.meetings.find((meeting) => meeting.id === id);
@@ -142,6 +149,14 @@ export function createFakeKkiruDb(seed: {
       create: jest.fn(({ data }: { data: Row }) => {
         db.records.push(data);
         return Promise.resolve(data);
+      }),
+      findFirst: jest.fn(({ where }: { where: Where }) =>
+        Promise.resolve(db.records.find((row) => matches(row, where)) ?? null),
+      ),
+      update: jest.fn(({ data, where }: { data: Row; where: Where }) => {
+        const record = db.records.find((row) => matches(row, where));
+        Object.assign(record ?? {}, data);
+        return Promise.resolve(record);
       }),
     },
   };

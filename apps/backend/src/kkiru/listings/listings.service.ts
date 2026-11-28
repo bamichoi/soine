@@ -1,9 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { generateRandomCode, normalizeRandomCode } from '../../common/random-code';
-import { type KkiruListing, type KkiruListingStatus, Prisma } from '../../generated/prisma/client';
+import {
+  type KkiruContractStatus,
+  type KkiruListing,
+  type KkiruListingStatus,
+  type KkiruMeetingStatus,
+  Prisma,
+} from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import { KKIRU_PAGE_SIZE, toPagination } from '../common/kkiru-fields';
+import { KKIRU_PAGE_SIZE, toDateString, toPagination } from '../common/kkiru-fields';
 import { pickSearch, type SortOrder } from '../common/list-query';
 import type {
   ListingDto,
@@ -49,6 +55,19 @@ export type ListingOption = Pick<
   | 'premium'
   | 'status'
 >;
+
+/** 이 매물이 미팅 매물로 걸린 미팅 한 건. contract는 이 미팅에서 이 매물로 맺은 가장 최근 계약 */
+export type ListingMeeting = {
+  code: string;
+  title: string;
+  customer: { name: string };
+  meetAt: string;
+  status: KkiruMeetingStatus;
+  contract: { id: string; status: KkiruContractStatus; contractedOn: string } | null;
+};
+
+/** 매물 상세: 매물 + 이 매물로 한 미팅 내역(최근 미팅 먼저, 계약취소 포함) */
+export type ListingDetail = Listing & { meetings: ListingMeeting[] };
 
 export type ListingListResponse = {
   items: Listing[];
@@ -192,7 +211,7 @@ export class KkiruListingsService {
     return listings.map(toListingOption);
   }
 
-  async findByCode(rawCode: string): Promise<Listing> {
+  async findByCode(rawCode: string): Promise<ListingDetail> {
     const code = normalizeRandomCode(rawCode);
     const listing = code ? await this.prisma.kkiruListing.findUnique({ where: { code } }) : null;
 
@@ -200,7 +219,49 @@ export class KkiruListingsService {
       throw listingNotFound();
     }
 
-    return toListing(listing);
+    const links = await this.prisma.kkiruMeetingListing.findMany({
+      orderBy: [{ meeting: { meetAt: 'desc' } }, { meeting: { createdAt: 'desc' } }],
+      select: {
+        meeting: {
+          select: {
+            code: true,
+            contracts: {
+              orderBy: [{ createdAt: 'desc' }],
+              select: { contractedOn: true, id: true, status: true },
+              take: 1,
+              where: { listingId: listing.id },
+            },
+            customer: { select: { name: true } },
+            meetAt: true,
+            status: true,
+            title: true,
+          },
+        },
+      },
+      where: { listingId: listing.id },
+    });
+
+    return {
+      ...toListing(listing),
+      meetings: links.map(({ meeting }) => {
+        const contract = meeting.contracts[0];
+
+        return {
+          code: meeting.code,
+          contract: contract
+            ? {
+                contractedOn: toDateString(contract.contractedOn),
+                id: contract.id,
+                status: contract.status,
+              }
+            : null,
+          customer: { name: meeting.customer.name },
+          meetAt: meeting.meetAt.toISOString(),
+          status: meeting.status,
+          title: meeting.title,
+        };
+      }),
+    };
   }
 
   async create(input: ListingDto): Promise<Listing> {
@@ -219,7 +280,7 @@ export class KkiruListingsService {
     }
   }
 
-  async update(rawCode: string, input: ListingDto): Promise<Listing> {
+  async update(rawCode: string, input: ListingDto): Promise<ListingDetail> {
     const code = normalizeRandomCode(rawCode);
     const { count } = code
       ? await this.prisma.kkiruListing.updateMany({ data: toData(input), where: { code } })

@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { FormField } from '@/components/form-field';
+import { KkiruLoader } from '@/components/kkiru-loader';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   createKkiruCustomer,
@@ -13,12 +14,18 @@ import {
   lookupKkiruCustomer,
   updateKkiruCustomer,
 } from '@/lib/kkiru-customers-api';
+import {
+  ERROR_BOX_CLASS_NAME,
+  FOCUS_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/kkiru-ui';
 import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 
 const LIST_PATH = '/kkiru/customers';
-
-const CONTROL_CLASS_NAME =
-  'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60 sm:w-64';
 
 function validateCustomer(name: string, phone: string): string | null {
   if (!name.trim()) {
@@ -84,14 +91,14 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
   return (
     <form
       aria-label={customer ? '고객 수정' : '새 고객'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-5" disabled={isSubmitting}>
         <legend className="sr-only">고객 정보</legend>
-        <FormField htmlFor={`${idPrefix}-name`} label="이름" required>
+        <FormField look="kkiru" htmlFor={`${idPrefix}-name`} label="이름" required>
           <input
-            className={CONTROL_CLASS_NAME}
+            className={`${INPUT_CLASS_NAME} sm:w-64`}
             id={`${idPrefix}-name`}
             maxLength={100}
             onChange={(event) => setName(event.target.value)}
@@ -99,10 +106,10 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
             value={name}
           />
         </FormField>
-        <FormField htmlFor={`${idPrefix}-phone`} label="연락처" required>
+        <FormField look="kkiru" htmlFor={`${idPrefix}-phone`} label="연락처" required>
           <input
             autoComplete="off"
-            className={`${CONTROL_CLASS_NAME} tabular-nums`}
+            className={`${INPUT_CLASS_NAME} tabular-nums sm:w-64`}
             id={`${idPrefix}-phone`}
             inputMode="tel"
             onChange={(event) => setPhone(formatPhone(event.target.value))}
@@ -112,9 +119,9 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
             value={phone}
           />
         </FormField>
-        <FormField htmlFor={`${idPrefix}-memo`} label="고객 메모">
+        <FormField look="kkiru" htmlFor={`${idPrefix}-memo`} label="고객 메모">
           <textarea
-            className="min-h-28 w-full resize-y border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-[var(--brand)] disabled:opacity-60"
+            className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28`}
             id={`${idPrefix}-memo`}
             maxLength={5000}
             onChange={(event) => setMemo(event.target.value)}
@@ -123,29 +130,25 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
         </FormField>
       </fieldset>
 
-      <footer className="mt-6 flex flex-col gap-3">
+      <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}{' '}
             {existing && existing.code !== customer?.code ? (
-              <Link className="underline underline-offset-2" href={`${LIST_PATH}/${existing.code}`}>
+              <Link
+                className={`cursor-pointer rounded-sm font-semibold underline underline-offset-2 transition hover:text-[var(--foreground)] hover:decoration-2 ${FOCUS_CLASS_NAME}`}
+                href={`${LIST_PATH}/${existing.code}`}
+              >
                 {existing.name} ({existing.code}) 보기
               </Link>
             ) : null}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
-          >
+          <Link className={SECONDARY_BUTTON_CLASS_NAME} href={cancelHref}>
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -153,12 +156,6 @@ export function KkiruCustomerForm({ customer }: KkiruCustomerFormProps) {
     </form>
   );
 }
-
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; customer: KkiruCustomerDetail };
 
 /** 고객을 불러와 그려 준다. 상세·수정 화면이 함께 쓴다. */
 export function KkiruCustomerLoader({
@@ -168,48 +165,9 @@ export function KkiruCustomerLoader({
   code: string;
   children: (customer: KkiruCustomerDetail) => React.ReactNode;
 }) {
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-    setState({ kind: 'loading' });
-
-    getKkiruCustomer(code)
-      .then((customer) => {
-        if (isActive) {
-          setState({ customer, kind: 'loaded' });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">고객을 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 고객을 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        고객을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  return <>{children(state.customer)}</>;
+  return (
+    <KkiruLoader load={getKkiruCustomer} loadKey={code} noun="고객">
+      {(customer) => children(customer)}
+    </KkiruLoader>
+  );
 }

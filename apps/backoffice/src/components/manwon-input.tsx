@@ -1,6 +1,7 @@
 'use client';
 
 import { toManwonText } from '@/lib/kkiru-format';
+import { INPUT_CLASS_NAME, INPUT_UNIT_CLASS_NAME } from '@/lib/kkiru-ui';
 
 type ManwonInputProps = {
   id: string;
@@ -9,12 +10,12 @@ type ManwonInputProps = {
   required?: boolean;
 };
 
-// 만원 단위 금액 입력칸. 숫자만 받고 쉼표를 붙인다.
+// 만원 단위 금액 입력칸. 숫자만 받고 쉼표를 붙인다. 현재 끼루 전용(끼루 회색 입력칸 모양).
 export function ManwonInput({ id, value, onChange, required = false }: ManwonInputProps) {
   return (
     <div className="relative sm:w-56">
       <input
-        className="h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 pr-12 text-right text-sm tabular-nums outline-none focus:border-[var(--brand)] disabled:opacity-60"
+        className={`${INPUT_CLASS_NAME} pr-14 text-right tabular-nums`}
         id={id}
         inputMode="numeric"
         onChange={(event) => onChange(toManwonText(event.target.value))}
@@ -22,9 +23,7 @@ export function ManwonInput({ id, value, onChange, required = false }: ManwonInp
         required={required}
         value={value}
       />
-      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-        만원
-      </span>
+      <span className={INPUT_UNIT_CLASS_NAME}>만원</span>
     </div>
   );
 }
