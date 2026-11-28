@@ -50,7 +50,7 @@ function CustomerResultRow({
         </span>
         <span className="shrink-0 tabular-nums">{formatPhone(customer.phone)}</span>
         <span className="w-14 shrink-0 text-right text-xs text-[var(--muted)]">
-          상담 {customer.consultationCount}건
+          미팅 {customer.meetingCount}건
         </span>
         <span className="w-8 shrink-0 text-right text-xs font-medium text-[var(--brand)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
           선택
@@ -143,7 +143,7 @@ export function KkiruCustomerSearchDialog({
     }
   }, [isOpen]);
 
-  // 이 모달은 상담 폼 안에 그려지므로 form을 겹쳐 쓰지 않고, Enter 키와 버튼으로 찾는다.
+  // 이 모달은 미팅 폼 안에 그려지므로 form을 겹쳐 쓰지 않고, Enter 키와 버튼으로 찾는다.
   async function handleSearch() {
     const trimmed = query.trim();
 

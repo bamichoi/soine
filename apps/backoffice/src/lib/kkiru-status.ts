@@ -1,10 +1,3 @@
-export type KkiruConsultationStatus =
-  | 'consulting'
-  | 'meeting'
-  | 'contracting'
-  | 'contracted'
-  | 'contract_cancelled';
-
 export type KkiruMeetingStatus =
   | 'meeting'
   | 'contracting'
@@ -14,17 +7,8 @@ export type KkiruMeetingStatus =
 
 export type KkiruContractStatus = 'contracting' | 'completed' | 'cancelled';
 
-/** 매물 상태. 미팅중·계약중은 걸린 미팅 상태에서 백엔드가 계산한다. */
+/** 매물 상태. 걸린 계약과 미팅 상태에서 백엔드가 계산한다. */
 export type KkiruListingStatus = 'available' | 'meeting' | 'contracting' | 'contracted';
-
-export const CONSULTATION_STATUS_LABELS: Record<KkiruConsultationStatus, string> = {
-  consulting: '상담중',
-  // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
-  contract_cancelled: '계약취소',
-  contracted: '계약완료',
-  contracting: '계약중',
-  meeting: '미팅중',
-};
 
 export const MEETING_STATUS_LABELS: Record<KkiruMeetingStatus, string> = {
   // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
@@ -70,7 +54,6 @@ const TONES: Record<string, StatusTone> = {
   available: 'idle',
   cancelled: 'negative',
   completed: 'done',
-  consulting: 'idle',
   // biome-ignore lint/style/useNamingConvention: API 상태 값 그대로 쓴다.
   contract_cancelled: 'negative',
   contracted: 'done',

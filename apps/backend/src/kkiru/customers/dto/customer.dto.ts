@@ -4,7 +4,7 @@ import { ListQueryDto } from '../../common/list-query';
 
 export const CUSTOMER_SEARCH_FIELDS = ['all', 'name', 'phone', 'code'] as const;
 export type CustomerSearchField = (typeof CUSTOMER_SEARCH_FIELDS)[number];
-export const CUSTOMER_SORT_FIELDS = ['name', 'phone', 'consultationCount', 'createdAt'] as const;
+export const CUSTOMER_SORT_FIELDS = ['name', 'phone', 'meetingCount', 'createdAt'] as const;
 export type CustomerSortField = (typeof CUSTOMER_SORT_FIELDS)[number];
 
 export class ListCustomersQueryDto extends ListQueryDto {

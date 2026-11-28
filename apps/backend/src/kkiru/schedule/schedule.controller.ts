@@ -6,7 +6,7 @@ import type { ScheduleItem } from './schedule.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { KkiruScheduleService } from './schedule.service';
 
-/** 일정 달력: 미팅·계약 일정 */
+/** 일정 달력: 미팅·계약·잔금 일정 */
 @Controller('admin/kkiru/schedule')
 @RequireAdminService('kkiru')
 @UseGuards(AdminSessionGuard)

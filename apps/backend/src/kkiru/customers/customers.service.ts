@@ -1,13 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { generateRandomCode, normalizeRandomCode } from '../../common/random-code';
-import {
-  type KkiruConsultationStatus,
-  type KkiruCustomer,
-  Prisma,
-} from '../../generated/prisma/client';
+import { type KkiruCustomer, type KkiruMeetingStatus, Prisma } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import { KKIRU_PAGE_SIZE, toDateString, toPagination } from '../common/kkiru-fields';
+import { KKIRU_PAGE_SIZE, toPagination } from '../common/kkiru-fields';
 import { pickSearch, type SortOrder } from '../common/list-query';
 import type {
   CustomerDto,
@@ -23,18 +19,18 @@ export type CustomerSummary = {
   code: string;
   name: string;
   phone: string;
-  consultationCount: number;
+  meetingCount: number;
   createdAt: string;
 };
 
-export type CustomerDetail = Omit<CustomerSummary, 'consultationCount'> & {
+export type CustomerDetail = Omit<CustomerSummary, 'meetingCount'> & {
   memo: string | null;
-  /** 이 고객의 상담 (상담일 최근 순) */
-  consultations: {
+  /** 이 고객의 미팅 (미팅 일시 최근 순) */
+  meetings: {
     code: string;
     title: string;
-    status: KkiruConsultationStatus;
-    consultedOn: string;
+    status: KkiruMeetingStatus;
+    meetAt: string;
   }[];
   updatedAt: string;
 };
@@ -85,20 +81,18 @@ const CUSTOMER_ORDER_BY: Record<
   CustomerSortField,
   (order: SortOrder) => Prisma.KkiruCustomerOrderByWithRelationInput
 > = {
-  consultationCount: (order) => ({ consultations: { _count: order } }),
   createdAt: (order) => ({ createdAt: order }),
+  meetingCount: (order) => ({ meetings: { _count: order } }),
   name: (order) => ({ name: order }),
   phone: (order) => ({ phone: order }),
 };
 
-function toSummary(
-  customer: KkiruCustomer & { _count: { consultations: number } },
-): CustomerSummary {
+function toSummary(customer: KkiruCustomer & { _count: { meetings: number } }): CustomerSummary {
   return {
     code: customer.code,
-    consultationCount: customer._count.consultations,
     createdAt: customer.createdAt.toISOString(),
     id: customer.id,
+    meetingCount: customer._count.meetings,
     name: customer.name,
     phone: customer.phone,
   };
@@ -119,7 +113,7 @@ export class KkiruCustomersService {
     const [total, customers] = await this.prisma.$transaction([
       this.prisma.kkiruCustomer.count({ where }),
       this.prisma.kkiruCustomer.findMany({
-        include: { _count: { select: { consultations: true } } },
+        include: { _count: { select: { meetings: true } } },
         orderBy: [CUSTOMER_ORDER_BY[sort](order), { createdAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * KKIRU_PAGE_SIZE,
         take: KKIRU_PAGE_SIZE,
@@ -130,10 +124,10 @@ export class KkiruCustomersService {
     return { items: customers.map(toSummary), pagination: toPagination(page, total) };
   }
 
-  /** 연락처로 기존 고객을 찾는다. 상담을 만들 때 쓴다. 없으면 404 */
+  /** 연락처로 기존 고객을 찾는다. 미팅을 만들 때 쓴다. 없으면 404 */
   async findByPhone(phone: string): Promise<CustomerSummary> {
     const customer = await this.prisma.kkiruCustomer.findUnique({
-      include: { _count: { select: { consultations: true } } },
+      include: { _count: { select: { meetings: true } } },
       where: { phone },
     });
 
@@ -149,9 +143,9 @@ export class KkiruCustomersService {
     const customer = code
       ? await this.prisma.kkiruCustomer.findUnique({
           include: {
-            consultations: {
-              orderBy: [{ consultedOn: 'desc' }, { createdAt: 'desc' }],
-              select: { code: true, consultedOn: true, status: true, title: true },
+            meetings: {
+              orderBy: [{ meetAt: 'desc' }, { createdAt: 'desc' }],
+              select: { code: true, meetAt: true, status: true, title: true },
             },
           },
           where: { code },
@@ -164,14 +158,14 @@ export class KkiruCustomersService {
 
     return {
       code: customer.code,
-      consultations: customer.consultations.map((consultation) => ({
-        code: consultation.code,
-        consultedOn: toDateString(consultation.consultedOn),
-        status: consultation.status,
-        title: consultation.title,
-      })),
       createdAt: customer.createdAt.toISOString(),
       id: customer.id,
+      meetings: customer.meetings.map((meeting) => ({
+        code: meeting.code,
+        meetAt: meeting.meetAt.toISOString(),
+        status: meeting.status,
+        title: meeting.title,
+      })),
       memo: customer.memo,
       name: customer.name,
       phone: customer.phone,

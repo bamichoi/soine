@@ -4,27 +4,44 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { normalizeRandomCode } from '../../common/random-code';
-import type {
-  KkiruContractStatus,
-  KkiruMeetingRecordKind,
-  KkiruMeetingStatus,
+import { generateRandomCode, normalizeRandomCode } from '../../common/random-code';
+import {
+  type KkiruContractStatus,
+  type KkiruCustomer,
+  type KkiruInflowSource,
+  type KkiruMeeting,
+  type KkiruMeetingRecordKind,
+  type KkiruMeetingStatus,
   Prisma,
 } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
-import { KKIRU_PAGE_SIZE, toDateOnly, toDateString, toPagination } from '../common/kkiru-fields';
+import {
+  KKIRU_PAGE_SIZE,
+  toDateOnly,
+  toDateString,
+  toPagination,
+  toSeoulDate,
+} from '../common/kkiru-fields';
 import { pickSearch, type SortOrder } from '../common/list-query';
 import type { LogRecordDto } from '../common/log-record.dto';
-import { lockRow, syncConsultationStatus, syncListingStatus } from '../common/status-sync';
+import {
+  CONTRACTABLE_MEETING_STATUSES,
+  lockRow,
+  syncListingStatus,
+  syncMeetingAndListings,
+} from '../common/status-sync';
 import { type ListingOption, toListingOption } from '../listings/listings.service';
 import type {
   CreateMeetingDto,
   ListMeetingsQueryDto,
+  MeetingFieldsDto,
   MeetingSearchField,
   MeetingSortField,
   UpdateMeetingDto,
 } from './dto/meeting.dto';
+
+const CODE_GENERATION_ATTEMPTS = 5;
 
 export type MeetingRecord = {
   id: string;
@@ -36,20 +53,41 @@ export type MeetingRecord = {
 
 export type MeetingSummary = {
   id: string;
-  /** 케이스 번호 (상담과 같다) */
-  caseCode: string;
-  consultationTitle: string;
+  /** 케이스 번호 */
+  code: string;
+  title: string;
   customer: { code: string; name: string; phone: string };
-  listing: { code: string; name: string };
+  interestArea: string;
+  desiredBusiness: string;
+  /** 예산 = 최대 보증금 + 최대 권리금 (만원) */
+  budget: number;
+  /** 미팅 일시 */
   meetAt: string;
   status: KkiruMeetingStatus;
 };
 
-export type MeetingDetail = Omit<MeetingSummary, 'listing'> & {
-  listing: ListingOption & { clientName: string; clientPhone: string };
+export type MeetingContract = {
+  id: string;
+  contractedOn: string;
+  status: KkiruContractStatus;
+  listing: { id: string; code: string; name: string };
+};
+
+export type MeetingDetail = MeetingSummary & {
+  desiredPyeongMin: number;
+  desiredPyeongMax: number;
+  desiredFloor: string;
+  desiredRent: number;
+  maxDeposit: number;
+  maxPremium: number;
+  inflowSource: KkiruInflowSource;
+  inflowSourceDetail: string | null;
+  stoppedAt: string | null;
   records: MeetingRecord[];
-  /** 이 미팅의 계약 (최근 순) */
-  contracts: { id: string; contractedOn: string; status: KkiruContractStatus }[];
+  /** 미팅 매물. contractStatus는 이 매물로 이 미팅에서 만든 가장 최근 계약의 상태 */
+  listings: (ListingOption & { addedAt: string; contractStatus: KkiruContractStatus | null })[];
+  /** 이 미팅의 계약 (최근 순, 취소된 계약 포함) */
+  contracts: MeetingContract[];
   /** 지금 새 계약을 만들 수 있는지 (미팅중이거나 계약이 취소된 뒤) */
   canStartContract: boolean;
   createdAt: string;
@@ -61,42 +99,27 @@ export type MeetingListResponse = {
   pagination: ReturnType<typeof toPagination>;
 };
 
-const SUMMARY_INCLUDE = {
-  consultation: { include: { customer: true } },
-  listing: true,
-} satisfies Prisma.KkiruMeetingInclude;
+const RECORD_ORDER = [
+  { recordedOn: 'asc' },
+  { createdAt: 'asc' },
+] satisfies Prisma.KkiruMeetingRecordOrderByWithRelationInput[];
 
 const DETAIL_INCLUDE = {
-  ...SUMMARY_INCLUDE,
   contracts: {
     orderBy: [{ createdAt: 'desc' }],
-    select: { contractedOn: true, id: true, status: true },
+    select: {
+      contractedOn: true,
+      id: true,
+      listing: { select: { code: true, id: true, name: true } },
+      status: true,
+    },
   },
-  records: { orderBy: [{ recordedOn: 'asc' }, { createdAt: 'asc' }] },
+  customer: true,
+  listings: { include: { listing: true }, orderBy: { createdAt: 'asc' } },
+  records: { orderBy: RECORD_ORDER },
 } satisfies Prisma.KkiruMeetingInclude;
 
-type MeetingWithSummary = Prisma.KkiruMeetingGetPayload<{ include: typeof SUMMARY_INCLUDE }>;
 type MeetingWithDetail = Prisma.KkiruMeetingGetPayload<{ include: typeof DETAIL_INCLUDE }>;
-
-/** 새 계약은 미팅중이거나 계약이 취소된 미팅에서만 만든다. */
-export const CONTRACTABLE_MEETING_STATUSES: KkiruMeetingStatus[] = [
-  'meeting',
-  'contract_cancelled',
-];
-
-function toSummary(meeting: MeetingWithSummary): MeetingSummary {
-  const { customer } = meeting.consultation;
-
-  return {
-    caseCode: meeting.consultation.code,
-    consultationTitle: meeting.consultation.title,
-    customer: { code: customer.code, name: customer.name, phone: customer.phone },
-    id: meeting.id,
-    listing: { code: meeting.listing.code, name: meeting.listing.name },
-    meetAt: meeting.meetAt.toISOString(),
-    status: meeting.status,
-  };
-}
 
 export function toMeetingRecord(record: {
   id: string;
@@ -114,6 +137,24 @@ export function toMeetingRecord(record: {
   };
 }
 
+function toSummary(meeting: KkiruMeeting & { customer: KkiruCustomer }): MeetingSummary {
+  return {
+    budget: meeting.maxDeposit + meeting.maxPremium,
+    code: meeting.code,
+    customer: {
+      code: meeting.customer.code,
+      name: meeting.customer.name,
+      phone: meeting.customer.phone,
+    },
+    desiredBusiness: meeting.desiredBusiness,
+    id: meeting.id,
+    interestArea: meeting.interestArea,
+    meetAt: meeting.meetAt.toISOString(),
+    status: meeting.status,
+    title: meeting.title,
+  };
+}
+
 function toDetail(meeting: MeetingWithDetail): MeetingDetail {
   return {
     ...toSummary(meeting),
@@ -121,20 +162,53 @@ function toDetail(meeting: MeetingWithDetail): MeetingDetail {
     contracts: meeting.contracts.map((contract) => ({
       contractedOn: toDateString(contract.contractedOn),
       id: contract.id,
+      listing: contract.listing,
       status: contract.status,
     })),
     createdAt: meeting.createdAt.toISOString(),
-    listing: {
-      ...toListingOption(meeting.listing),
-      clientName: meeting.listing.clientName,
-      clientPhone: meeting.listing.clientPhone,
-    },
+    desiredFloor: meeting.desiredFloor,
+    desiredPyeongMax: meeting.desiredPyeongMax.toNumber(),
+    desiredPyeongMin: meeting.desiredPyeongMin.toNumber(),
+    desiredRent: meeting.desiredRent,
+    inflowSource: meeting.inflowSource,
+    inflowSourceDetail: meeting.inflowSourceDetail,
+    listings: meeting.listings.map(({ createdAt, listing }) => ({
+      ...toListingOption(listing),
+      addedAt: createdAt.toISOString(),
+      // 계약은 최근 순이므로 처음 찾은 계약이 가장 최근 계약이다.
+      contractStatus:
+        meeting.contracts.find((contract) => contract.listing.id === listing.id)?.status ?? null,
+    })),
+    maxDeposit: meeting.maxDeposit,
+    maxPremium: meeting.maxPremium,
     records: meeting.records.map(toMeetingRecord),
+    stoppedAt: meeting.stoppedAt?.toISOString() ?? null,
     updatedAt: meeting.updatedAt.toISOString(),
   };
 }
 
-/** 케이스 번호·고객 이름·매물(이름·번호)·상담 제목으로 찾는다. field로 한 항목만 고를 수 있다. */
+function toFieldData(input: MeetingFieldsDto) {
+  if (input.desiredPyeongMin > input.desiredPyeongMax) {
+    throw new BadRequestException('desiredPyeongMin must not exceed desiredPyeongMax');
+  }
+
+  return {
+    desiredBusiness: input.desiredBusiness,
+    desiredFloor: input.desiredFloor,
+    desiredPyeongMax: new Prisma.Decimal(input.desiredPyeongMax),
+    desiredPyeongMin: new Prisma.Decimal(input.desiredPyeongMin),
+    desiredRent: input.desiredRent,
+    inflowSource: input.inflowSource,
+    inflowSourceDetail: input.inflowSource === 'other' ? (input.inflowSourceDetail ?? null) : null,
+    interestArea: input.interestArea,
+    maxDeposit: input.maxDeposit,
+    maxPremium: input.maxPremium,
+    meetAt: new Date(input.meetAt),
+    title: input.title,
+  };
+}
+
+/** 케이스 번호·제목·고객 이름·연락처·관심 상권·희망 업종으로 찾는다. field로 한 항목만 고를 수 있다. */
 export function buildMeetingSearch(
   query: string,
   field: MeetingSearchField = 'all',
@@ -145,17 +219,16 @@ export function buildMeetingSearch(
 
   const contains = { contains: query, mode: 'insensitive' as const };
   const code = normalizeRandomCode(query);
-  const listingByName: Prisma.KkiruMeetingWhereInput = { listing: { name: contains } };
+  const digits = query.replace(/\D/g, '');
 
   return pickSearch<Prisma.KkiruMeetingWhereInput>(
     {
-      caseCode: code ? { consultation: { code: { contains: code } } } : null,
-      consultationTitle: { consultation: { title: contains } },
-      customer: { consultation: { customer: { name: contains } } },
-      listing: code
-        ? // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
-          { OR: [listingByName, { listing: { code: { contains: code } } }] }
-        : listingByName,
+      code: code ? { code: { contains: code } } : null,
+      customer: { customer: { name: contains } },
+      desiredBusiness: { desiredBusiness: contains },
+      interestArea: { interestArea: contains },
+      phone: digits.length >= 3 ? { customer: { phone: { contains: digits } } } : null,
+      title: { title: contains },
     },
     field,
   );
@@ -165,34 +238,24 @@ const MEETING_ORDER_BY: Record<
   MeetingSortField,
   (order: SortOrder) => Prisma.KkiruMeetingOrderByWithRelationInput
 > = {
-  consultationTitle: (order) => ({ consultation: { title: order } }),
-  customer: (order) => ({ consultation: { customer: { name: order } } }),
-  listing: (order) => ({ listing: { name: order } }),
+  customer: (order) => ({ customer: { name: order } }),
+  desiredBusiness: (order) => ({ desiredBusiness: order }),
+  interestArea: (order) => ({ interestArea: order }),
   meetAt: (order) => ({ meetAt: order }),
   status: (order) => ({ status: order }),
+  title: (order) => ({ title: order }),
 };
 
 function meetingNotFound() {
   return new NotFoundException('Meeting not found');
 }
 
-async function requireAvailableListing(
-  tx: Prisma.TransactionClient,
-  listingId: string,
-): Promise<void> {
-  const listing = await tx.kkiruListing.findUnique({
-    select: { status: true },
-    where: { id: listingId },
-  });
-
-  if (!listing) {
-    throw new BadRequestException('Unknown listing');
-  }
-
-  // 다른 고객이 미팅·계약 중인 매물도 미팅은 잡을 수 있다. 계약완료된 매물만 막는다.
-  if (listing.status === 'contracted') {
-    throw new ConflictException('Listing is already contracted');
-  }
+function isUniqueViolation(error: unknown, field: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002' &&
+    JSON.stringify(error.meta ?? {}).includes(field)
+  );
 }
 
 @Injectable()
@@ -211,7 +274,7 @@ export class KkiruMeetingsService {
     const [total, meetings] = await this.prisma.$transaction([
       this.prisma.kkiruMeeting.count({ where }),
       this.prisma.kkiruMeeting.findMany({
-        include: SUMMARY_INCLUDE,
+        include: { customer: true },
         orderBy: [MEETING_ORDER_BY[sort](order), { meetAt: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * KKIRU_PAGE_SIZE,
         take: KKIRU_PAGE_SIZE,
@@ -222,11 +285,11 @@ export class KkiruMeetingsService {
     return { items: meetings.map(toSummary), pagination: toPagination(page, total) };
   }
 
-  async findById(id: string): Promise<MeetingDetail> {
-    const meeting = await this.prisma.kkiruMeeting.findUnique({
-      include: DETAIL_INCLUDE,
-      where: { id },
-    });
+  async findByCode(rawCode: string): Promise<MeetingDetail> {
+    const code = normalizeRandomCode(rawCode);
+    const meeting = code
+      ? await this.prisma.kkiruMeeting.findUnique({ include: DETAIL_INCLUDE, where: { code } })
+      : null;
 
     if (!meeting) {
       throw meetingNotFound();
@@ -235,166 +298,227 @@ export class KkiruMeetingsService {
     return toDetail(meeting);
   }
 
-  /** 미팅 진행: 미팅을 만들고 상담 상태를 다시 맞춘다(미팅중). */
+  /** 미팅을 만든다. 미팅 내용은 로그의 첫 기록(미팅 날짜)이 된다. */
   async create(input: CreateMeetingDto): Promise<MeetingDetail> {
-    const code = normalizeRandomCode(input.consultationCode);
-    const consultation = code
-      ? await this.prisma.kkiruConsultation.findUnique({ select: { id: true }, where: { code } })
+    const customerCode = normalizeRandomCode(input.customerCode);
+    const customer = customerCode
+      ? await this.prisma.kkiruCustomer.findUnique({
+          select: { id: true },
+          where: { code: customerCode },
+        })
       : null;
 
-    if (!consultation) {
-      throw new BadRequestException('Unknown consultation');
+    if (!customer) {
+      throw new BadRequestException('Unknown customer');
     }
 
-    const meetAt = new Date(input.meetAt);
-    const id = await this.prisma.$transaction(async (tx) => {
-      await lockRow(tx, 'consultations', consultation.id);
-      await requireAvailableListing(tx, input.listingId);
+    const data = toFieldData(input);
 
-      const meeting = await tx.kkiruMeeting.create({
-        data: {
-          consultationId: consultation.id,
-          listingId: input.listingId,
-          meetAt,
-          records: {
-            create: [{ content: input.content, kind: 'note', recordedOn: toSeoulDate(meetAt) }],
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const meeting = await this.prisma.kkiruMeeting.create({
+          data: {
+            ...data,
+            code: generateRandomCode(),
+            customerId: customer.id,
+            records: {
+              create: [
+                { content: input.content, kind: 'note', recordedOn: toSeoulDate(data.meetAt) },
+              ],
+            },
           },
-        },
-      });
-      await syncConsultationStatus(tx, consultation.id);
-      await syncListingStatus(tx, input.listingId);
+        });
 
-      return meeting.id;
-    });
-
-    return this.findById(id);
-  }
-
-  /** 미팅 일시·대상 매물을 고친다. 계약이 진행 중이거나 끝났으면 매물은 바꿀 수 없다. */
-  async update(id: string, input: UpdateMeetingDto): Promise<MeetingDetail> {
-    await this.prisma.$transaction(async (tx) => {
-      const meeting = await this.lockMeeting(tx, id);
-
-      if (input.listingId !== meeting.listingId) {
-        if (!['meeting', 'stopped'].includes(meeting.status)) {
-          throw new ConflictException('Listing cannot change after a contract');
+        return this.findByCode(meeting.code);
+      } catch (error) {
+        if (!isUniqueViolation(error, 'code') || attempt >= CODE_GENERATION_ATTEMPTS) {
+          throw error;
         }
-
-        await requireAvailableListing(tx, input.listingId);
       }
-
-      await tx.kkiruMeeting.update({
-        data: { listingId: input.listingId, meetAt: new Date(input.meetAt) },
-        where: { id },
-      });
-
-      // 매물을 바꿨으면 이전 매물과 새 매물의 상태를 둘 다 다시 맞춘다.
-      if (input.listingId !== meeting.listingId) {
-        await syncListingStatus(tx, meeting.listingId);
-        await syncListingStatus(tx, input.listingId);
-      }
-    });
-
-    return this.findById(id);
+    }
   }
 
-  async addRecord(id: string, input: LogRecordDto): Promise<MeetingDetail> {
-    await this.requireMeeting(id);
+  /** 미팅 항목을 고친다. 고객과 상태는 바꾸지 않는다. */
+  async update(rawCode: string, input: UpdateMeetingDto): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
+
+    await this.prisma.kkiruMeeting.update({
+      data: toFieldData(input),
+      where: { id: meeting.id },
+    });
+
+    return this.findByCode(meeting.code);
+  }
+
+  async addRecord(rawCode: string, input: LogRecordDto): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
+
     await this.prisma.kkiruMeetingRecord.create({
       data: {
         content: input.content,
         kind: 'note',
-        meetingId: id,
+        meetingId: meeting.id,
         recordedOn: toDateOnly(input.recordedOn),
       },
     });
 
-    return this.findById(id);
+    return this.findByCode(meeting.code);
   }
 
   /** 로그 기록을 고친다. 기록은 지우지 않는다. */
-  async updateRecord(id: string, recordId: string, input: LogRecordDto): Promise<MeetingDetail> {
+  async updateRecord(
+    rawCode: string,
+    recordId: string,
+    input: LogRecordDto,
+  ): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
     const { count } = await this.prisma.kkiruMeetingRecord.updateMany({
       data: { content: input.content, recordedOn: toDateOnly(input.recordedOn) },
-      where: { id: recordId, meetingId: id },
+      where: { id: recordId, meetingId: meeting.id },
     });
 
     if (count === 0) {
       throw new NotFoundException('Record not found');
     }
 
-    return this.findById(id);
+    return this.findByCode(meeting.code);
   }
 
-  /** 미팅중단: 사유를 로그에 남기고 진행중단으로 바꾼다. */
-  stop(id: string, reason: string): Promise<MeetingDetail> {
-    return this.changeStatus(id, 'meeting', 'stopped', 'stopped', reason);
-  }
+  /** 미팅 매물을 더한다. 계약완료된 매물은 더할 수 없다. 더한 매물은 상태를 다시 맞춘다(미팅중). */
+  async addListing(rawCode: string, listingId: string): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
 
-  /** 미팅재개: 사유를 로그에 남기고 미팅중으로 되돌린다. */
-  resume(id: string, reason: string): Promise<MeetingDetail> {
-    return this.changeStatus(id, 'stopped', 'meeting', 'resumed', reason);
-  }
-
-  private async changeStatus(
-    id: string,
-    from: KkiruMeetingStatus,
-    to: KkiruMeetingStatus,
-    kind: KkiruMeetingRecordKind,
-    reason: string,
-  ): Promise<MeetingDetail> {
     await this.prisma.$transaction(async (tx) => {
-      const meeting = await this.lockMeeting(tx, id);
+      await lockRow(tx, 'meetings', meeting.id);
+      const listing = await tx.kkiruListing.findUnique({
+        select: { id: true },
+        where: { id: listingId },
+      });
 
-      if (meeting.status !== from) {
-        throw new ConflictException(`Meeting status must be ${from} but is ${meeting.status}`);
+      if (!listing) {
+        throw new BadRequestException('Unknown listing');
       }
 
-      await tx.kkiruMeeting.update({ data: { status: to }, where: { id } });
-      await tx.kkiruMeetingRecord.create({
-        data: { content: reason, kind, meetingId: id, recordedOn: toSeoulDate(new Date()) },
+      await lockRow(tx, 'listings', listingId);
+      const locked = await tx.kkiruListing.findUniqueOrThrow({
+        select: { status: true },
+        where: { id: listingId },
       });
-      await syncConsultationStatus(tx, meeting.consultationId);
-      await syncListingStatus(tx, meeting.listingId);
+
+      if (locked.status === 'contracted') {
+        throw new ConflictException('Listing is already contracted');
+      }
+
+      const existing = await tx.kkiruMeetingListing.findUnique({
+        select: { listingId: true },
+        // biome-ignore lint/style/useNamingConvention: Prisma compound key name.
+        where: { meetingId_listingId: { listingId, meetingId: meeting.id } },
+      });
+
+      // 이미 더한 매물이면 그대로 둔다.
+      if (!existing) {
+        await tx.kkiruMeetingListing.create({ data: { listingId, meetingId: meeting.id } });
+        await syncListingStatus(tx, listingId);
+      }
     });
 
-    return this.findById(id);
+    return this.findByCode(meeting.code);
   }
 
-  private async lockMeeting(tx: Prisma.TransactionClient, id: string) {
-    const meeting = await tx.kkiruMeeting.findUnique({
-      select: { consultationId: true, listingId: true, status: true },
-      where: { id },
+  /** 잘못 더한 미팅 매물을 뺀다. 연결만 끊고 매물은 그대로 둔다. 계약이 걸린 매물은 뺄 수 없다. */
+  async removeListing(rawCode: string, listingId: string): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
+
+    await this.prisma.$transaction(async (tx) => {
+      await lockRow(tx, 'meetings', meeting.id);
+      const contractCount = await tx.kkiruContract.count({
+        where: { listingId, meetingId: meeting.id },
+      });
+
+      if (contractCount > 0) {
+        throw new ConflictException('Listing has a contract in this meeting');
+      }
+
+      const { count } = await tx.kkiruMeetingListing.deleteMany({
+        where: { listingId, meetingId: meeting.id },
+      });
+
+      if (count === 0) {
+        throw new NotFoundException('Listing is not in this meeting');
+      }
+
+      await lockRow(tx, 'listings', listingId);
+      await syncListingStatus(tx, listingId);
     });
+
+    return this.findByCode(meeting.code);
+  }
+
+  /** 미팅 중단: 미팅중·계약취소 상태에서만. 사유를 로그에 남기고 중단 시각을 채운다. */
+  stop(rawCode: string, reason: string): Promise<MeetingDetail> {
+    return this.changeStopped(rawCode, 'stop', reason);
+  }
+
+  /** 미팅 재개: 진행중단 상태에서만. 사유를 로그에 남기고 중단 시각을 비운 뒤 상태를 다시 맞춘다. */
+  resume(rawCode: string, reason: string): Promise<MeetingDetail> {
+    return this.changeStopped(rawCode, 'resume', reason);
+  }
+
+  private async changeStopped(
+    rawCode: string,
+    action: 'stop' | 'resume',
+    reason: string,
+  ): Promise<MeetingDetail> {
+    const meeting = await this.requireMeeting(rawCode);
+
+    await this.prisma.$transaction(async (tx) => {
+      await lockRow(tx, 'meetings', meeting.id);
+      // 잠근 뒤 다시 읽어 그사이 바뀐 상태를 반영한다.
+      const locked = await tx.kkiruMeeting.findUniqueOrThrow({
+        select: { status: true },
+        where: { id: meeting.id },
+      });
+      const canChange =
+        action === 'stop'
+          ? CONTRACTABLE_MEETING_STATUSES.includes(locked.status)
+          : locked.status === 'stopped';
+
+      if (!canChange) {
+        throw new ConflictException(`Meeting status ${locked.status} cannot ${action}`);
+      }
+
+      const now = new Date();
+      await tx.kkiruMeeting.update({
+        data: { stoppedAt: action === 'stop' ? now : null },
+        where: { id: meeting.id },
+      });
+      await tx.kkiruMeetingRecord.create({
+        data: {
+          content: reason,
+          kind: action === 'stop' ? 'stopped' : 'resumed',
+          meetingId: meeting.id,
+          recordedOn: toSeoulDate(now),
+        },
+      });
+      await syncMeetingAndListings(tx, meeting.id);
+    });
+
+    return this.findByCode(meeting.code);
+  }
+
+  private async requireMeeting(rawCode: string): Promise<{ id: string; code: string }> {
+    const code = normalizeRandomCode(rawCode);
+    const meeting = code
+      ? await this.prisma.kkiruMeeting.findUnique({
+          select: { code: true, id: true },
+          where: { code },
+        })
+      : null;
 
     if (!meeting) {
       throw meetingNotFound();
     }
 
-    await lockRow(tx, 'consultations', meeting.consultationId);
-    await lockRow(tx, 'meetings', id);
-
-    // 잠근 뒤 다시 읽어 그사이 바뀐 상태를 반영한다.
-    return tx.kkiruMeeting.findUniqueOrThrow({
-      select: { consultationId: true, listingId: true, status: true },
-      where: { id },
-    });
+    return meeting;
   }
-
-  private async requireMeeting(id: string): Promise<void> {
-    const meeting = await this.prisma.kkiruMeeting.findUnique({
-      select: { id: true },
-      where: { id },
-    });
-
-    if (!meeting) {
-      throw meetingNotFound();
-    }
-  }
-}
-
-/** 시각의 한국 날짜 (DATE 컬럼용, UTC 자정) */
-export function toSeoulDate(date: Date): Date {
-  const seoul = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return toDateOnly(seoul.toISOString().slice(0, 10));
 }

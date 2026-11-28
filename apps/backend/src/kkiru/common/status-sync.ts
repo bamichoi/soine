@@ -1,83 +1,169 @@
 import type {
-  KkiruConsultationStatus,
+  KkiruContractStatus,
   KkiruListingStatus,
   KkiruMeetingStatus,
   Prisma,
 } from '../../generated/prisma/client';
 
-// 상담 상태 = 연결된 미팅 중 가장 앞선 단계. 진행중단된 미팅은 세지 않는다.
-const CONSULTATION_PRIORITY: {
-  meeting: KkiruMeetingStatus;
-  consultation: KkiruConsultationStatus;
-}[] = [
-  { consultation: 'contracted', meeting: 'contracted' },
-  { consultation: 'contracting', meeting: 'contracting' },
-  { consultation: 'meeting', meeting: 'meeting' },
-  { consultation: 'contract_cancelled', meeting: 'contract_cancelled' },
+// 미팅·매물 상태는 계약과 중단 여부에서 계산한다(ADR-0009). 버튼으로 직접 바꾸지 않는다.
+// 바꾼 트랜잭션 안에서 미팅 상태를 먼저, 매물 상태를 나중에 맞춘다.
+// 잠금 순서는 미팅 → 계약 → 매물(매물끼리는 id 순)로 지켜 교착을 막는다.
+
+/** 새 계약은 미팅중이거나 계약이 취소된 미팅에서만 만든다. 미팅 중단도 이 두 상태에서만 한다. */
+export const CONTRACTABLE_MEETING_STATUSES: KkiruMeetingStatus[] = [
+  'meeting',
+  'contract_cancelled',
 ];
 
-export function deriveConsultationStatus(
-  meetingStatuses: KkiruMeetingStatus[],
-): KkiruConsultationStatus {
-  const found = CONSULTATION_PRIORITY.find(({ meeting }) => meetingStatuses.includes(meeting));
-  return found ? found.consultation : 'consulting';
+/**
+ * 미팅 상태: 완료 계약 → 계약완료 > 계약중 계약 → 계약중 > 중단됨 → 진행중단
+ * > 취소 계약만 있음 → 계약취소 > 그 외 미팅중
+ */
+export function deriveMeetingStatus(input: {
+  contractStatuses: KkiruContractStatus[];
+  isStopped: boolean;
+}): KkiruMeetingStatus {
+  const { contractStatuses, isStopped } = input;
+
+  if (contractStatuses.includes('completed')) {
+    return 'contracted';
+  }
+
+  if (contractStatuses.includes('contracting')) {
+    return 'contracting';
+  }
+
+  if (isStopped) {
+    return 'stopped';
+  }
+
+  return contractStatuses.includes('cancelled') ? 'contract_cancelled' : 'meeting';
 }
 
-/** 상담의 미팅 상태를 읽어 상담 상태를 다시 맞춘다. 미팅·계약을 바꾼 트랜잭션 안에서 부른다. */
-export async function syncConsultationStatus(
-  tx: Prisma.TransactionClient,
-  consultationId: string,
-): Promise<KkiruConsultationStatus> {
-  const meetings = await tx.kkiruMeeting.findMany({
-    select: { status: true },
-    where: { consultationId },
-  });
-  const status = deriveConsultationStatus(meetings.map((meeting) => meeting.status));
+/**
+ * 매물 상태: 이 매물의 완료 계약 → 계약완료 > 계약중 계약 → 계약중
+ * > 미팅중·계약취소 상태인 미팅의 미팅 매물 → 미팅중 > 그 외 계약가능
+ */
+export function deriveListingStatus(input: {
+  contractStatuses: KkiruContractStatus[];
+  meetingStatuses: KkiruMeetingStatus[];
+}): KkiruListingStatus {
+  const { contractStatuses, meetingStatuses } = input;
 
-  await tx.kkiruConsultation.update({ data: { status }, where: { id: consultationId } });
+  if (contractStatuses.includes('completed')) {
+    return 'contracted';
+  }
+
+  if (contractStatuses.includes('contracting')) {
+    return 'contracting';
+  }
+
+  return meetingStatuses.some((status) => CONTRACTABLE_MEETING_STATUSES.includes(status))
+    ? 'meeting'
+    : 'available';
+}
+
+/** 미팅의 계약과 중단 여부를 읽어 미팅 상태를 다시 맞춘다. */
+export async function syncMeetingStatus(
+  tx: Prisma.TransactionClient,
+  meetingId: string,
+): Promise<KkiruMeetingStatus> {
+  const meeting = await tx.kkiruMeeting.findUniqueOrThrow({
+    select: { contracts: { select: { status: true } }, stoppedAt: true },
+    where: { id: meetingId },
+  });
+  const status = deriveMeetingStatus({
+    contractStatuses: meeting.contracts.map((contract) => contract.status),
+    isStopped: meeting.stoppedAt !== null,
+  });
+
+  await tx.kkiruMeeting.update({ data: { status }, where: { id: meetingId } });
 
   return status;
 }
 
-// 매물 상태 = 이 매물에 걸린 미팅 중 가장 앞선 단계. 진행중단된 미팅은 세지 않는다.
-// 계약이 취소된 미팅은 그 매물로 다시 계약할 수 있으므로 미팅중으로 본다.
-const LISTING_PRIORITY: { meeting: KkiruMeetingStatus; listing: KkiruListingStatus }[] = [
-  { listing: 'contracted', meeting: 'contracted' },
-  { listing: 'contracting', meeting: 'contracting' },
-  { listing: 'meeting', meeting: 'meeting' },
-  { listing: 'meeting', meeting: 'contract_cancelled' },
-];
-
-export function deriveListingStatus(meetingStatuses: KkiruMeetingStatus[]): KkiruListingStatus {
-  const found = LISTING_PRIORITY.find(({ meeting }) => meetingStatuses.includes(meeting));
-  return found ? found.listing : 'available';
-}
-
-/** 매물에 걸린 미팅 상태를 읽어 매물 상태를 다시 맞춘다. 미팅·계약을 바꾼 트랜잭션 안에서 부른다. */
+/** 매물의 계약과, 이 매물이 미팅 매물로 걸린 미팅 상태를 읽어 매물 상태를 다시 맞춘다. */
 export async function syncListingStatus(
   tx: Prisma.TransactionClient,
   listingId: string,
 ): Promise<KkiruListingStatus> {
-  const meetings = await tx.kkiruMeeting.findMany({
+  const contracts = await tx.kkiruContract.findMany({
     select: { status: true },
     where: { listingId },
   });
-  const status = deriveListingStatus(meetings.map((meeting) => meeting.status));
+  const links = await tx.kkiruMeetingListing.findMany({
+    select: { meeting: { select: { status: true } } },
+    where: { listingId },
+  });
+  const status = deriveListingStatus({
+    contractStatuses: contracts.map((contract) => contract.status),
+    meetingStatuses: links.map((link) => link.meeting.status),
+  });
 
   await tx.kkiruListing.update({ data: { status }, where: { id: listingId } });
 
   return status;
 }
 
-/** 같은 상담·미팅을 동시에 바꾸지 않도록 행을 잠근다. */
+/** 같은 미팅·계약·매물을 동시에 바꾸지 않도록 행을 잠근다. */
 export async function lockRow(
   tx: Prisma.TransactionClient,
-  table: 'consultations' | 'meetings' | 'contracts' | 'listings',
+  table: 'meetings' | 'contracts' | 'listings',
   id: string,
 ): Promise<void> {
-  // 테이블 이름은 위 네 값 중 하나로만 들어온다.
+  // 테이블 이름은 위 세 값 중 하나로만 들어온다.
   await tx.$executeRawUnsafe(
     `SELECT 1 FROM "kkiru"."${table}" WHERE "id" = $1::uuid FOR UPDATE`,
     id,
   );
+}
+
+/**
+ * 미팅의 모든 미팅 매물과 계약 매물(그리고 extraListingIds)을 id 순으로 잠그고 id 목록을 돌려준다.
+ * 미팅(과 계약)을 잠근 뒤에 부른다.
+ */
+export async function lockMeetingListings(
+  tx: Prisma.TransactionClient,
+  meetingId: string,
+  extraListingIds: string[] = [],
+): Promise<string[]> {
+  const links = await tx.kkiruMeetingListing.findMany({
+    select: { listingId: true },
+    where: { meetingId },
+  });
+  const contracts = await tx.kkiruContract.findMany({
+    select: { listingId: true },
+    where: { meetingId },
+  });
+  const ids = [
+    ...new Set([
+      ...links.map((link) => link.listingId),
+      ...contracts.map((contract) => contract.listingId),
+      ...extraListingIds,
+    ]),
+  ].sort();
+
+  for (const id of ids) {
+    await lockRow(tx, 'listings', id);
+  }
+
+  return ids;
+}
+
+/**
+ * 미팅 중단·재개, 계약 생성·완료·취소 뒤에 부른다.
+ * 미팅 상태를 먼저 맞추고, 그 미팅의 모든 미팅 매물과 계약 매물 상태를 다시 맞춘다.
+ */
+export async function syncMeetingAndListings(
+  tx: Prisma.TransactionClient,
+  meetingId: string,
+): Promise<KkiruMeetingStatus> {
+  const status = await syncMeetingStatus(tx, meetingId);
+  const listingIds = await lockMeetingListings(tx, meetingId);
+
+  for (const listingId of listingIds) {
+    await syncListingStatus(tx, listingId);
+  }
+
+  return status;
 }

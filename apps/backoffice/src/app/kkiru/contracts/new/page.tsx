@@ -14,7 +14,10 @@ export default function KkiruNewContractPage() {
       <h1 className="sr-only">계약</h1>
       <Suspense>
         <div className="flex max-w-3xl flex-col gap-4">
-          <PageTitleBar actions={<BackToListLink href="/kkiru/contracts" />} title="계약 진행" />
+          <PageTitleBar
+            actions={<BackToListLink href="/kkiru/contracts" keepQuery={false} />}
+            title="계약 진행"
+          />
           <KkiruNewContract />
         </div>
       </Suspense>

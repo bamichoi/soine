@@ -224,22 +224,22 @@ model ChoidolsangReservation {
 }
 
 // ───────────────────────── 끼루 (부동산 중개) ─────────────────────────
-// 고객(임차인) → 상담 → 미팅(매물별) → 계약. 한 상담에 미팅이 여러 개, 한 미팅에 계약이 여러 개 생길 수 있다.
+// 고객(임차인) → 미팅(미팅 매물 여러 개) → 계약(미팅 매물 하나). 한 미팅에 계약이 여러 개 생길 수 있다(ADR-0009).
 // 끼루 데이터는 삭제하지 않는다.
 
 /// 끼루 고객(임차인). 연락처로 같은 사람인지 찾는다.
 model KkiruCustomer {
-  id            String              @id @default(uuid()) @db.Uuid
+  id        String         @id @default(uuid()) @db.Uuid
   /// 화면·주소에 쓰는 고객 번호. 8자리 무작위 코드
-  code          String              @unique @db.VarChar(16)
-  name          String              @db.VarChar(100)
+  code      String         @unique @db.VarChar(16)
+  name      String         @db.VarChar(100)
   /// 연락처. 숫자만 저장하며 고객마다 하나뿐이다.
-  phone         String              @unique @db.VarChar(20)
+  phone     String         @unique @db.VarChar(20)
   /// 고객 메모 (선택)
-  memo          String?             @db.Text
-  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
-  consultations KkiruConsultation[]
+  memo      String?        @db.Text
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(3)
+  meetings  KkiruMeeting[]
 
   @@map("customers")
   @@schema("kkiru")
@@ -257,15 +257,15 @@ enum KkiruListingStatus {
 
 /// 끼루 매물(임대). 계약완료된 매물이 다시 나오면 새로 등록한다.
 model KkiruListing {
-  id            String                     @id @default(uuid()) @db.Uuid
+  id            String                @id @default(uuid()) @db.Uuid
   /// 매물 번호. 8자리 무작위 코드
-  code          String                     @unique @db.VarChar(16)
-  name          String                     @db.VarChar(100)
-  address       String                     @db.VarChar(300)
+  code          String                @unique @db.VarChar(16)
+  name          String                @db.VarChar(100)
+  address       String                @db.VarChar(300)
   /// 면적(㎡). 화면에서 평으로 함께 보여 준다.
-  areaM2        Decimal                    @db.Decimal(10, 2)
+  areaM2        Decimal               @db.Decimal(10, 2)
   /// 층수 (예: 1층, 지하1층, 2~3층)
-  floor         String                     @db.VarChar(50)
+  floor         String                @db.VarChar(50)
   /// 임대료(월세, 만원)
   rent          Int
   /// 보증금(만원)
@@ -275,110 +275,20 @@ model KkiruListing {
   hasParking    Boolean?
   restroomCount Int?
   /// 특징 (서술)
-  features      String?                    @db.Text
+  features      String?               @db.Text
   /// 매물 의뢰인
-  clientName    String                     @db.VarChar(100)
+  clientName    String                @db.VarChar(100)
   /// 의뢰인 연락처 (숫자만)
-  clientPhone   String                     @db.VarChar(20)
-  status        KkiruListingStatus         @default(available)
-  createdAt     DateTime                   @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime                   @updatedAt @db.Timestamptz(3)
-  consultations KkiruConsultationListing[]
-  meetings      KkiruMeeting[]
+  clientPhone   String                @db.VarChar(20)
+  /// 걸린 계약·미팅에서 자동으로 정한다 (common/status-sync.ts)
+  status        KkiruListingStatus    @default(available)
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+  meetings      KkiruMeetingListing[]
+  contracts     KkiruContract[]
 
   @@index([createdAt(sort: Desc)], map: "listings_created_at_idx")
   @@map("listings")
-  @@schema("kkiru")
-}
-
-enum KkiruConsultationStatus {
-  consulting // 상담중
-  meeting // 미팅중
-  contracting // 계약중
-  contracted // 계약완료
-  contract_cancelled // 계약취소
-
-  @@map("consultation_status")
-  @@schema("kkiru")
-}
-
-enum KkiruInflowSource {
-  naver_land // 네이버부동산
-  instagram // 인스타그램
-  other // 기타 (직접 입력)
-
-  @@map("inflow_source")
-  @@schema("kkiru")
-}
-
-/// 끼루 상담. 케이스 번호는 이 상담에서 이어진 미팅·계약이 함께 쓴다.
-model KkiruConsultation {
-  id                 String                     @id @default(uuid()) @db.Uuid
-  /// 케이스 번호. 8자리 무작위 코드
-  code               String                     @unique @db.VarChar(16)
-  customerId         String                     @db.Uuid
-  customer           KkiruCustomer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  /// 고객 화면의 상담 목록에 보일 이름
-  title              String                     @db.VarChar(100)
-  /// 관심 상권
-  interestArea       String                     @db.VarChar(200)
-  /// 희망 업종
-  desiredBusiness    String                     @db.VarChar(200)
-  /// 희망 평수 범위(평)
-  desiredPyeongMin   Decimal                    @db.Decimal(8, 2)
-  desiredPyeongMax   Decimal                    @db.Decimal(8, 2)
-  /// 희망 층수 (예: 1층, 1~2층)
-  desiredFloor       String                     @db.VarChar(50)
-  /// 희망 임대료(만원)
-  desiredRent        Int
-  /// 최대 가용 보증금(만원)
-  maxDeposit         Int
-  /// 최대 가용 권리금(만원). 예산 = 보증금 + 권리금 (저장하지 않고 계산)
-  maxPremium         Int
-  inflowSource       KkiruInflowSource
-  /// 유입 경로가 기타일 때 직접 입력한 내용
-  inflowSourceDetail String?                    @db.VarChar(100)
-  consultedOn        DateTime                   @db.Date
-  /// 연결된 미팅·계약 중 가장 앞선 단계로 자동으로 정한다.
-  status             KkiruConsultationStatus    @default(consulting)
-  createdAt          DateTime                   @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime                   @updatedAt @db.Timestamptz(3)
-  records            KkiruConsultationRecord[]
-  listings           KkiruConsultationListing[]
-  meetings           KkiruMeeting[]
-
-  @@index([customerId], map: "consultations_customer_id_idx")
-  @@index([consultedOn(sort: Desc), createdAt(sort: Desc)], map: "consultations_consulted_on_idx")
-  @@map("consultations")
-  @@schema("kkiru")
-}
-
-/// 상담 내용 로그. 첫 기록이 첫 상담이다. 기록은 고칠 수만 있고 지우지 않는다.
-model KkiruConsultationRecord {
-  id             String            @id @default(uuid()) @db.Uuid
-  consultationId String            @db.Uuid
-  consultation   KkiruConsultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
-  recordedOn     DateTime          @db.Date
-  content        String            @db.Text
-  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
-
-  @@index([consultationId, recordedOn, createdAt], map: "consultation_records_consultation_id_idx")
-  @@map("consultation_records")
-  @@schema("kkiru")
-}
-
-/// 상담매물 기록: 상담하면서 고객에게 권한 매물
-model KkiruConsultationListing {
-  consultationId String            @db.Uuid
-  consultation   KkiruConsultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
-  listingId      String            @db.Uuid
-  listing        KkiruListing      @relation(fields: [listingId], references: [id], onDelete: Restrict)
-  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
-
-  @@id([consultationId, listingId])
-  @@index([listingId], map: "consultation_listings_listing_id_idx")
-  @@map("consultation_listings")
   @@schema("kkiru")
 }
 
@@ -393,25 +303,56 @@ enum KkiruMeetingStatus {
   @@schema("kkiru")
 }
 
-/// 끼루 미팅. 매물 하나를 두고 진행한다. 다른 매물로 다시 미팅하면 새 미팅을 만든다.
-model KkiruMeeting {
-  id             String               @id @default(uuid()) @db.Uuid
-  consultationId String               @db.Uuid
-  consultation   KkiruConsultation    @relation(fields: [consultationId], references: [id], onDelete: Restrict)
-  /// 대상 매물
-  listingId      String               @db.Uuid
-  listing        KkiruListing         @relation(fields: [listingId], references: [id], onDelete: Restrict)
-  /// 미팅 일시
-  meetAt         DateTime             @db.Timestamptz(3)
-  status         KkiruMeetingStatus   @default(meeting)
-  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
-  records        KkiruMeetingRecord[]
-  contracts      KkiruContract[]
+enum KkiruInflowSource {
+  naver_land // 네이버부동산
+  instagram // 인스타그램
+  other // 기타 (직접 입력)
 
-  @@index([consultationId], map: "meetings_consultation_id_idx")
-  @@index([listingId], map: "meetings_listing_id_idx")
-  @@index([meetAt(sort: Desc)], map: "meetings_meet_at_idx")
+  @@map("inflow_source")
+  @@schema("kkiru")
+}
+
+/// 끼루 미팅. 고객 한 명과 여러 매물을 두고 진행한다. 케이스 번호는 이 미팅의 계약이 함께 쓴다.
+model KkiruMeeting {
+  id                 String                @id @default(uuid()) @db.Uuid
+  /// 케이스 번호. 8자리 무작위 코드
+  code               String                @unique @db.VarChar(16)
+  customerId         String                @db.Uuid
+  customer           KkiruCustomer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /// 고객 화면의 미팅 목록에 보일 이름
+  title              String                @db.VarChar(100)
+  /// 관심 상권
+  interestArea       String                @db.VarChar(200)
+  /// 희망 업종
+  desiredBusiness    String                @db.VarChar(200)
+  /// 희망 평수 범위(평)
+  desiredPyeongMin   Decimal               @db.Decimal(8, 2)
+  desiredPyeongMax   Decimal               @db.Decimal(8, 2)
+  /// 희망 층수 (예: 1층, 1~2층)
+  desiredFloor       String                @db.VarChar(50)
+  /// 희망 임대료(만원)
+  desiredRent        Int
+  /// 최대 가용 보증금(만원)
+  maxDeposit         Int
+  /// 최대 가용 권리금(만원). 예산 = 보증금 + 권리금 (저장하지 않고 계산)
+  maxPremium         Int
+  inflowSource       KkiruInflowSource
+  /// 유입 경로가 기타일 때 직접 입력한 내용
+  inflowSourceDetail String?               @db.VarChar(100)
+  /// 미팅 일시
+  meetAt             DateTime              @db.Timestamptz(3)
+  /// 미팅 중단 시각. 값이 있으면 진행중단이다(계약이 진행 중이면 계약 상태가 앞선다).
+  stoppedAt          DateTime?             @db.Timestamptz(3)
+  /// 계약과 중단 여부로 자동으로 정한다 (common/status-sync.ts)
+  status             KkiruMeetingStatus    @default(meeting)
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+  records            KkiruMeetingRecord[]
+  listings           KkiruMeetingListing[]
+  contracts          KkiruContract[]
+
+  @@index([customerId], map: "meetings_customer_id_idx")
+  @@index([meetAt(sort: Desc), createdAt(sort: Desc)], map: "meetings_meet_at_idx")
   @@map("meetings")
   @@schema("kkiru")
 }
@@ -426,7 +367,7 @@ enum KkiruMeetingRecordKind {
   @@schema("kkiru")
 }
 
-/// 미팅 내용 로그. 중단·재개·계약취소 사유도 여기에 남는다. 지우지 않는다.
+/// 미팅 내용 로그. 첫 기록이 첫 미팅이다. 중단·재개·계약취소 사유도 여기에 남는다. 지우지 않는다.
 model KkiruMeetingRecord {
   id         String                 @id @default(uuid()) @db.Uuid
   meetingId  String                 @db.Uuid
@@ -442,6 +383,20 @@ model KkiruMeetingRecord {
   @@schema("kkiru")
 }
 
+/// 미팅 매물: 미팅에서 고객에게 권한 매물
+model KkiruMeetingListing {
+  meetingId String       @db.Uuid
+  meeting   KkiruMeeting @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  listingId String       @db.Uuid
+  listing   KkiruListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@id([meetingId, listingId])
+  @@index([listingId], map: "meeting_listings_listing_id_idx")
+  @@map("meeting_listings")
+  @@schema("kkiru")
+}
+
 enum KkiruContractStatus {
   contracting // 계약중
   completed // 계약완료
@@ -451,12 +406,16 @@ enum KkiruContractStatus {
   @@schema("kkiru")
 }
 
-/// 끼루 계약. 미팅 하나에 진행 중인(계약중·계약완료) 계약은 하나뿐이다.
-/// 계약이 취소된 뒤 같은 매물로 다시 계약하면 그 미팅에서 새 계약을 만든다.
+/// 끼루 계약. 미팅에서 매물 하나를 골라 만든다. 한 미팅에 계약중인 계약은 하나뿐이고,
+/// 계약완료된 계약이 있으면 새 계약을 만들지 않는다(계약 생성 시 검사).
+/// 계약이 취소된 뒤에는 같은 미팅에서 새 계약을 만들 수 있다.
 model KkiruContract {
   id            String              @id @default(uuid()) @db.Uuid
   meetingId     String              @db.Uuid
   meeting       KkiruMeeting        @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  /// 대상 매물
+  listingId     String              @db.Uuid
+  listing       KkiruListing        @relation(fields: [listingId], references: [id], onDelete: Restrict)
   contractedOn  DateTime            @db.Date
   /// 임대인 (매물 의뢰인과 같으면 계약 시점 값을 복사)
   landlordName  String              @db.VarChar(100)
@@ -471,6 +430,10 @@ model KkiruContract {
   specialTerms  String?             @db.Text
   /// 계약금(만원)
   downPayment   Int
+  /// 잔금(만원). 기본값은 보증금 − 계약금이지만 직접 고칠 수 있다.
+  balance       Int
+  /// 잔금일. 계약 일자와 같거나 뒤다.
+  balanceDueOn  DateTime            @db.Date
   /// 수수료(만원). 수입 집계에 쓴다.
   commission    Int
   isMyListing   Boolean
@@ -484,7 +447,9 @@ model KkiruContract {
   updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
 
   @@index([meetingId], map: "contracts_meeting_id_idx")
+  @@index([listingId], map: "contracts_listing_id_idx")
   @@index([contractedOn(sort: Desc)], map: "contracts_contracted_on_idx")
+  @@index([balanceDueOn], map: "contracts_balance_due_on_idx")
   @@map("contracts")
   @@schema("kkiru")
 }

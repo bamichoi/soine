@@ -6,9 +6,9 @@ import { Icon } from '@/components/icon';
 import { KkiruCustomerLoader } from '@/components/kkiru-customer-form';
 import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
 import { PhoneNumber } from '@/components/phone-number';
-import { formatInquiryDate } from '@/lib/choidolsang-inquiries-api';
+import { formatSeoulDateTime } from '@/lib/choidolsang-inquiries-api';
 import type { KkiruCustomerDetail } from '@/lib/kkiru-customers-api';
-import { CONSULTATION_STATUS_LABELS } from '@/lib/kkiru-status';
+import { MEETING_STATUS_LABELS } from '@/lib/kkiru-status';
 
 const SECONDARY_BUTTON_CLASS_NAME =
   'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
@@ -46,44 +46,41 @@ function CustomerBody({ customer }: { customer: KkiruCustomerDetail }) {
           </section>
         ) : null}
 
-        <section aria-label="상담" className="flex flex-col gap-3">
+        <section aria-label="미팅" className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-xs text-[var(--muted)]">상담 {customer.consultations.length}건</h3>
+            <h3 className="text-xs text-[var(--muted)]">미팅 {customer.meetings.length}건</h3>
             <Link
               className="inline-flex h-8 items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]"
-              href={`/kkiru/consultations/new?customer=${customer.code}`}
+              href={`/kkiru/meetings/new?customer=${customer.code}`}
             >
-              <Icon className="size-3.5" name="plus" />새 상담
+              <Icon className="size-3.5" name="plus" />새 미팅
             </Link>
           </div>
-          {customer.consultations.length > 0 ? (
+          {customer.meetings.length > 0 ? (
             <ul className="flex flex-col border border-[var(--line)]">
-              {customer.consultations.map((consultation) => (
-                <li
-                  className="border-b border-[var(--line)] last:border-b-0"
-                  key={consultation.code}
-                >
+              {customer.meetings.map((meeting) => (
+                <li className="border-b border-[var(--line)] last:border-b-0" key={meeting.code}>
                   <Link
                     className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-[var(--background)]"
-                    href={`/kkiru/consultations/${consultation.code}`}
+                    href={`/kkiru/meetings/${meeting.code}`}
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-medium">{consultation.title}</span>
+                      <span className="truncate font-medium">{meeting.title}</span>
                       <span className="text-xs text-[var(--muted)] tabular-nums">
-                        <span className="font-mono">{consultation.code}</span> ·{' '}
-                        {formatInquiryDate(consultation.consultedOn)}
+                        <span className="font-mono">{meeting.code}</span> ·{' '}
+                        {formatSeoulDateTime(meeting.meetAt)}
                       </span>
                     </span>
                     <KkiruStatusBadge
-                      label={CONSULTATION_STATUS_LABELS[consultation.status]}
-                      status={consultation.status}
+                      label={MEETING_STATUS_LABELS[meeting.status]}
+                      status={meeting.status}
                     />
                   </Link>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-[var(--muted)]">아직 상담이 없습니다.</p>
+            <p className="text-sm text-[var(--muted)]">아직 미팅이 없습니다.</p>
           )}
         </section>
       </div>

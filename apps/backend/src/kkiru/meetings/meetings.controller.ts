@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -15,12 +16,17 @@ import { AdminSessionGuard, RequireAdminService } from '../../admin-auth/admin-s
 // biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
 import { LogRecordDto, ReasonDto } from '../common/log-record.dto';
 // biome-ignore lint/style/useImportType: ValidationPipe needs the runtime DTO class.
-import { CreateMeetingDto, ListMeetingsQueryDto, UpdateMeetingDto } from './dto/meeting.dto';
+import {
+  AddMeetingListingDto,
+  CreateMeetingDto,
+  ListMeetingsQueryDto,
+  UpdateMeetingDto,
+} from './dto/meeting.dto';
 import type { MeetingDetail, MeetingListResponse } from './meetings.service';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { KkiruMeetingsService } from './meetings.service';
 
-// 끼루 데이터는 삭제하지 않으므로 삭제 API가 없다.
+// 끼루 데이터는 삭제하지 않는다. 미팅 매물 빼기만 연결을 끊는다.
 @Controller('admin/kkiru/meetings')
 @RequireAdminService('kkiru')
 @UseGuards(AdminSessionGuard)
@@ -37,45 +43,56 @@ export class KkiruMeetingsController {
     return this.meetingsService.create(body);
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<MeetingDetail> {
-    return this.meetingsService.findById(id);
+  @Get(':code')
+  findOne(@Param('code') code: string): Promise<MeetingDetail> {
+    return this.meetingsService.findByCode(code);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: UpdateMeetingDto,
-  ): Promise<MeetingDetail> {
-    return this.meetingsService.update(id, body);
+  @Patch(':code')
+  update(@Param('code') code: string, @Body() body: UpdateMeetingDto): Promise<MeetingDetail> {
+    return this.meetingsService.update(code, body);
   }
 
-  @Post(':id/records')
-  addRecord(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: LogRecordDto,
-  ): Promise<MeetingDetail> {
-    return this.meetingsService.addRecord(id, body);
+  @Post(':code/records')
+  addRecord(@Param('code') code: string, @Body() body: LogRecordDto): Promise<MeetingDetail> {
+    return this.meetingsService.addRecord(code, body);
   }
 
-  @Patch(':id/records/:recordId')
+  @Patch(':code/records/:recordId')
   updateRecord(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('code') code: string,
     @Param('recordId', ParseUUIDPipe) recordId: string,
     @Body() body: LogRecordDto,
   ): Promise<MeetingDetail> {
-    return this.meetingsService.updateRecord(id, recordId, body);
+    return this.meetingsService.updateRecord(code, recordId, body);
   }
 
-  @Post(':id/stop')
-  @HttpCode(HttpStatus.OK)
-  stop(@Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto): Promise<MeetingDetail> {
-    return this.meetingsService.stop(id, body.reason);
+  @Post(':code/listings')
+  addListing(
+    @Param('code') code: string,
+    @Body() body: AddMeetingListingDto,
+  ): Promise<MeetingDetail> {
+    return this.meetingsService.addListing(code, body.listingId);
   }
 
-  @Post(':id/resume')
+  /** 미팅 매물 빼기 (미팅과 매물의 연결만 끊는다). 계약이 걸린 매물은 뺄 수 없다. */
+  @Delete(':code/listings/:listingId')
+  removeListing(
+    @Param('code') code: string,
+    @Param('listingId', ParseUUIDPipe) listingId: string,
+  ): Promise<MeetingDetail> {
+    return this.meetingsService.removeListing(code, listingId);
+  }
+
+  @Post(':code/stop')
   @HttpCode(HttpStatus.OK)
-  resume(@Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto): Promise<MeetingDetail> {
-    return this.meetingsService.resume(id, body.reason);
+  stop(@Param('code') code: string, @Body() body: ReasonDto): Promise<MeetingDetail> {
+    return this.meetingsService.stop(code, body.reason);
+  }
+
+  @Post(':code/resume')
+  @HttpCode(HttpStatus.OK)
+  resume(@Param('code') code: string, @Body() body: ReasonDto): Promise<MeetingDetail> {
+    return this.meetingsService.resume(code, body.reason);
   }
 }

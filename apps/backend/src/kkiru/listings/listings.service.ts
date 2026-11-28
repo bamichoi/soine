@@ -181,7 +181,7 @@ export class KkiruListingsService {
     return { items: listings.map(toListing), pagination: toPagination(page, total) };
   }
 
-  /** 상담매물·미팅 대상으로 고를 수 있는(계약완료가 아닌) 매물 검색 */
+  /** 미팅 매물·계약 대상으로 고를 수 있는(계약완료가 아닌) 매물 검색 */
   async options({ limit = 20, q = '' }: ListingOptionsQueryDto = {}): Promise<ListingOption[]> {
     const listings = await this.prisma.kkiruListing.findMany({
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],

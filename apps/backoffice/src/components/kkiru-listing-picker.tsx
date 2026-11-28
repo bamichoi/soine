@@ -1,27 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
 import { formatArea, formatManwon } from '@/lib/kkiru-format';
 import { type KkiruListingOption, searchKkiruListingOptions } from '@/lib/kkiru-listings-api';
+import { type KkiruListingStatus, LISTING_STATUS_LABELS } from '@/lib/kkiru-status';
 
 type KkiruListingPickerProps = {
-  /** 고르기 쉬운 후보 (예: 상담매물 기록) */
+  /** 고르기 쉬운 후보 (예: 미팅 매물) */
   suggestions?: KkiruListingOption[];
   selectedId?: string | null;
   onPick: (listing: KkiruListingOption) => void;
   /** 이미 고른 매물은 목록에서 흐리게 보인다. */
   excludeIds?: string[];
+  /** 이 상태의 매물은 흐리게 보이고 고를 수 없다. 상태 이름을 함께 보여 준다. */
+  disabledStatuses?: KkiruListingStatus[];
 };
 
 function ListingRow({
   listing,
   selected,
   disabled,
+  statusLabel,
   onPick,
 }: {
   listing: KkiruListingOption;
   selected: boolean;
   disabled: boolean;
+  /** 고를 수 없는 까닭이 되는 매물 상태 */
+  statusLabel: string | null;
   onPick: () => void;
 }) {
   return (
@@ -43,6 +50,7 @@ function ListingRow({
             {formatManwon(listing.deposit)} / 월 {formatManwon(listing.rent)}
           </span>
         </span>
+        {statusLabel ? <KkiruStatusBadge label={statusLabel} status={listing.status} /> : null}
       </button>
     </li>
   );
@@ -54,6 +62,7 @@ export function KkiruListingPicker({
   selectedId,
   onPick,
   excludeIds = [],
+  disabledStatuses = [],
 }: KkiruListingPickerProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<KkiruListingOption[] | null>(null);
@@ -89,7 +98,12 @@ export function KkiruListingPicker({
     };
   }, [query]);
 
-  const shown = results ?? suggestions.filter((listing) => listing.status !== 'contracted');
+  // 계약완료된 후보는 흐리게 보여 줄 때만 남긴다. 검색 결과에는 계약완료 매물이 나오지 않는다.
+  const shown =
+    results ??
+    suggestions.filter(
+      (listing) => listing.status !== 'contracted' || disabledStatuses.includes('contracted'),
+    );
 
   return (
     <div className="flex flex-col gap-2">
@@ -102,7 +116,7 @@ export function KkiruListingPicker({
         value={query}
       />
       {results === null && suggestions.length > 0 ? (
-        <p className="text-xs text-[var(--muted)]">상담매물에서 고르거나 검색해 주세요.</p>
+        <p className="text-xs text-[var(--muted)]">미팅 매물에서 고르거나 검색해 주세요.</p>
       ) : null}
       {isError ? (
         <p className="text-xs text-[var(--error)]" role="alert">
@@ -111,15 +125,20 @@ export function KkiruListingPicker({
       ) : null}
       {shown.length > 0 ? (
         <ul className="flex max-h-72 flex-col divide-y divide-[var(--line)] overflow-y-auto border border-[var(--line)]">
-          {shown.map((listing) => (
-            <ListingRow
-              disabled={excludeIds.includes(listing.id)}
-              key={listing.id}
-              listing={listing}
-              onPick={() => onPick(listing)}
-              selected={listing.id === selectedId}
-            />
-          ))}
+          {shown.map((listing) => {
+            const isBlocked = disabledStatuses.includes(listing.status);
+
+            return (
+              <ListingRow
+                disabled={isBlocked || excludeIds.includes(listing.id)}
+                key={listing.id}
+                listing={listing}
+                onPick={() => onPick(listing)}
+                selected={listing.id === selectedId}
+                statusLabel={isBlocked ? LISTING_STATUS_LABELS[listing.status] : null}
+              />
+            );
+          })}
         </ul>
       ) : null}
       {results !== null && results.length === 0 && !isError ? (

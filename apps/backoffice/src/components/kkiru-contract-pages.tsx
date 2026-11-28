@@ -14,7 +14,7 @@ import {
   listContracts,
 } from '@/lib/kkiru-cases-api';
 import { formatManwon } from '@/lib/kkiru-format';
-import { parseRouteId } from '@/lib/kkiru-route';
+import { parseRouteCode } from '@/lib/kkiru-route';
 import { CONTRACT_STATUS_LABELS, type KkiruContractStatus } from '@/lib/kkiru-status';
 
 const COLUMNS: ListColumn<ContractSummary>[] = [
@@ -51,6 +51,21 @@ const COLUMNS: ListColumn<ContractSummary>[] = [
     render: (c) => formatManwon(c.commission),
   },
   {
+    align: 'right',
+    firstOrder: 'desc',
+    key: 'balance',
+    sortField: 'balance',
+    label: '잔금',
+    render: (c) => formatManwon(c.balance),
+  },
+  {
+    firstOrder: 'asc',
+    key: 'balanceDueOn',
+    sortField: 'balanceDueOn',
+    label: '잔금일',
+    render: (c) => <span className="tabular-nums">{formatInquiryDate(c.balanceDueOn)}</span>,
+  },
+  {
     key: 'status',
     sortField: 'status',
     label: '상태',
@@ -71,7 +86,7 @@ export function KkiruContractTable() {
       columns={COLUMNS}
       emptyText="아직 계약이 없습니다. 미팅 상세에서 계약 진행을 눌러 만들어 주세요."
       load={listContracts}
-      minWidth="56rem"
+      minWidth="68rem"
       rowLink={(c) => ({
         extra: <CopyCodeButton code={c.caseCode} label="케이스 번호" />,
         href: `/kkiru/contracts/${c.id}`,
@@ -93,9 +108,11 @@ export function KkiruContractTable() {
 }
 
 export function KkiruNewContract() {
-  const meetingId = parseRouteId(useSearchParams().get('meeting') ?? '');
+  const searchParams = useSearchParams();
+  const meetingCode = parseRouteCode(searchParams.get('meeting') ?? '');
+  const listingCode = parseRouteCode(searchParams.get('listing') ?? '');
 
-  if (!meetingId) {
+  if (!meetingCode) {
     return (
       <p className="py-10 text-sm text-[var(--muted)]">
         계약은 미팅 상세의 계약 진행에서 만들 수 있습니다.
@@ -104,10 +121,10 @@ export function KkiruNewContract() {
   }
 
   return (
-    <KkiruLoader load={getMeeting} loadKey={meetingId} noun="미팅">
+    <KkiruLoader load={getMeeting} loadKey={meetingCode} noun="미팅">
       {(meeting) =>
         meeting.canStartContract ? (
-          <KkiruContractForm meeting={meeting} mode="create" />
+          <KkiruContractForm initialListingCode={listingCode} meeting={meeting} mode="create" />
         ) : (
           <p className="py-10 text-sm text-[var(--muted)]">
             이 미팅은 지금 계약을 만들 수 없는 상태입니다.

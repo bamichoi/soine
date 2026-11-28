@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
-import { KkiruConsultationsController } from './consultations/consultations.controller';
-import { KkiruConsultationsService } from './consultations/consultations.service';
 import { KkiruContractsController } from './contracts/contracts.controller';
 import { KkiruContractsService } from './contracts/contracts.service';
 import { KkiruCustomersController } from './customers/customers.controller';
@@ -16,7 +14,6 @@ import { KkiruScheduleService } from './schedule/schedule.service';
 /** 끼루(부동산 중개) 백오피스 API */
 @Module({
   controllers: [
-    KkiruConsultationsController,
     KkiruContractsController,
     KkiruCustomersController,
     KkiruListingsController,
@@ -25,7 +22,6 @@ import { KkiruScheduleService } from './schedule/schedule.service';
   ],
   imports: [AdminAuthModule],
   providers: [
-    KkiruConsultationsService,
     KkiruContractsService,
     KkiruCustomersService,
     KkiruListingsService,

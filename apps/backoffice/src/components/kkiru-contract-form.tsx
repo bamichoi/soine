@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react';
 import { FormField } from '@/components/form-field';
+import { KkiruListingPicker } from '@/components/kkiru-listing-picker';
+import { KkiruStatusBadge } from '@/components/kkiru-status-badge';
 import { ManwonInput } from '@/components/manwon-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import { getSeoulToday } from '@/lib/choidolsang-inquiries-api';
@@ -14,15 +16,30 @@ import {
   type MeetingDetail,
   updateContract,
 } from '@/lib/kkiru-cases-api';
-import { parseManwonText, toManwonText } from '@/lib/kkiru-format';
+import { formatManwon, parseManwonText, toManwonText } from '@/lib/kkiru-format';
+import {
+  getKkiruListing,
+  type KkiruListing,
+  type KkiruListingOption,
+} from '@/lib/kkiru-listings-api';
+import { type KkiruListingStatus, LISTING_STATUS_LABELS } from '@/lib/kkiru-status';
 import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 
 const CONTROL_CLASS_NAME =
   'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
 type KkiruContractFormProps =
-  | { mode: 'create'; meeting: MeetingDetail }
+  | { mode: 'create'; meeting: MeetingDetail; initialListingCode?: string | null }
   | { mode: 'edit'; contract: ContractDetail };
+
+/** 이 상태의 매물로는 새 계약을 만들 수 없다. */
+const BLOCKED_LISTING_STATUSES: KkiruListingStatus[] = ['contracting', 'contracted'];
+
+/** 계약 대상 매물. 임대인 기준값(의뢰인)과 금액 기본값을 여기서 가져온다. */
+type TargetListing = Pick<
+  KkiruListing,
+  'id' | 'code' | 'name' | 'deposit' | 'rent' | 'premium' | 'status' | 'clientName' | 'clientPhone'
+>;
 
 type FormValues = {
   contractedOn: string;
@@ -36,6 +53,10 @@ type FormValues = {
   leaseEndOn: string;
   specialTerms: string;
   downPaymentText: string;
+  balanceText: string;
+  /** 사용자가 잔금을 직접 고쳤으면 true. 그 뒤로는 보증금·계약금이 바뀌어도 잔금을 덮어쓰지 않는다. */
+  balanceEdited: boolean;
+  balanceDueOn: string;
   commissionText: string;
   isMyListing: boolean | null;
   isMyClient: boolean | null;
@@ -43,34 +64,83 @@ type FormValues = {
 
 type Target = {
   caseCode: string;
+  title: string;
   customer: { name: string; phone: string };
-  listing: { code: string; name: string; clientName: string; clientPhone: string };
 };
 
 function describeTarget(props: KkiruContractFormProps): Target {
-  const source = props.mode === 'create' ? props.meeting : props.contract;
-  return { caseCode: source.caseCode, customer: source.customer, listing: source.listing };
+  return props.mode === 'create'
+    ? { caseCode: props.meeting.code, customer: props.meeting.customer, title: props.meeting.title }
+    : {
+        caseCode: props.contract.caseCode,
+        customer: props.contract.customer,
+        title: props.contract.meeting.title,
+      };
+}
+
+/** 잔금 기본값: 보증금 − 계약금 (음수면 0). 둘 중 하나라도 비어 있으면 비운다. */
+function toDefaultBalanceText(depositText: string, downPaymentText: string): string {
+  const deposit = parseManwonText(depositText);
+  const downPayment = parseManwonText(downPaymentText);
+
+  if (deposit === null || downPayment === null) {
+    return '';
+  }
+
+  return toManwonText(String(Math.max(deposit - downPayment, 0)));
+}
+
+/** 잔금을 아직 고치지 않았으면 자동으로 채운다는 안내를 보여 준다. */
+function balanceHint(values: FormValues): string | undefined {
+  return values.balanceEdited
+    ? undefined
+    : '보증금 − 계약금으로 채웁니다. 직접 고치면 그 값을 그대로 씁니다.';
+}
+
+/** 잔금을 직접 고치기 전까지만 보증금·계약금에 맞춰 잔금을 다시 채운다. */
+function withAutoBalance(values: FormValues): FormValues {
+  return values.balanceEdited
+    ? values
+    : { ...values, balanceText: toDefaultBalanceText(values.depositText, values.downPaymentText) };
+}
+
+/** 매물을 고르면 금액 기본값과 임대인(의뢰인과 동일)을 그 매물 기준으로 다시 채운다. */
+function withListingDefaults(values: FormValues, listing: TargetListing | null): FormValues {
+  return withAutoBalance({
+    ...values,
+    depositText: listing ? toManwonText(String(listing.deposit)) : '',
+    landlordName: '',
+    landlordPhone: '',
+    premiumText: listing ? toManwonText(String(listing.premium)) : '',
+    rentText: listing ? toManwonText(String(listing.rent)) : '',
+    sameAsClient: true,
+  });
 }
 
 function toValues(props: KkiruContractFormProps): FormValues {
   if (props.mode === 'create') {
-    const { listing } = props.meeting;
-    return {
-      commissionText: '',
-      contractedOn: getSeoulToday(),
-      depositText: toManwonText(String(listing.deposit)),
-      downPaymentText: '',
-      isMyClient: null,
-      isMyListing: null,
-      landlordName: '',
-      landlordPhone: '',
-      leaseEndOn: '',
-      leaseStartOn: '',
-      premiumText: toManwonText(String(listing.premium)),
-      rentText: toManwonText(String(listing.rent)),
-      sameAsClient: true,
-      specialTerms: '',
-    };
+    return withListingDefaults(
+      {
+        balanceDueOn: '',
+        balanceEdited: false,
+        balanceText: '',
+        commissionText: '',
+        contractedOn: getSeoulToday(),
+        depositText: '',
+        downPaymentText: '',
+        isMyClient: null,
+        isMyListing: null,
+        landlordName: '',
+        landlordPhone: '',
+        leaseEndOn: '',
+        leaseStartOn: '',
+        premiumText: '',
+        rentText: '',
+        sameAsClient: true,
+        specialTerms: '',
+      },
+      null,
+    );
   }
 
   const { contract } = props;
@@ -78,7 +148,11 @@ function toValues(props: KkiruContractFormProps): FormValues {
     contract.landlordName === contract.listing.clientName &&
     contract.landlordPhone === contract.listing.clientPhone;
 
+  // 수정 모드는 저장된 잔금을 그대로 보여 주고, 보증금·계약금을 바꿔도 덮어쓰지 않는다.
   return {
+    balanceDueOn: contract.balanceDueOn,
+    balanceEdited: true,
+    balanceText: toManwonText(String(contract.balance)),
     commissionText: toManwonText(String(contract.commission)),
     contractedOn: contract.contractedOn,
     depositText: toManwonText(String(contract.deposit)),
@@ -110,10 +184,13 @@ function validate(values: FormValues): string | null {
         values.rentText,
         values.premiumText,
         values.downPaymentText,
+        values.balanceText,
         values.commissionText,
       ].every((text) => parseManwonText(text) !== null),
-      '금액(보증금·임대료·권리금·계약금·수수료)을 모두 입력해 주세요. 없으면 0을 넣어 주세요.',
+      '금액(보증금·임대료·권리금·계약금·잔금·수수료)을 모두 입력해 주세요. 없으면 0을 넣어 주세요.',
     ],
+    [Boolean(values.balanceDueOn), '잔금일을 입력해 주세요.'],
+    [values.balanceDueOn >= values.contractedOn, '잔금일은 계약 일자와 같거나 뒤여야 합니다.'],
     [Boolean(values.leaseStartOn && values.leaseEndOn), '임대차 기간을 입력해 주세요.'],
     [values.leaseEndOn >= values.leaseStartOn, '임대차 종료일은 시작일보다 앞설 수 없습니다.'],
     [
@@ -129,6 +206,8 @@ function toInput(values: FormValues): ContractFieldsInput {
   const amount = (text: string) => parseManwonText(text) as number;
 
   return {
+    balance: amount(values.balanceText),
+    balanceDueOn: values.balanceDueOn,
     commission: amount(values.commissionText),
     contractedOn: values.contractedOn,
     deposit: amount(values.depositText),
@@ -144,6 +223,102 @@ function toInput(values: FormValues): ContractFieldsInput {
     rent: amount(values.rentText),
     specialTerms: values.specialTerms.trim() || null,
   };
+}
+
+function saveContract(
+  props: KkiruContractFormProps,
+  input: ContractFieldsInput,
+  listingId: string,
+): Promise<ContractDetail> {
+  return props.mode === 'edit'
+    ? updateContract(props.contract.id, input)
+    : createContract({ ...input, listingId, meetingCode: props.meeting.code });
+}
+
+function submitErrorText(error: unknown, isEdit: boolean): string {
+  if (!(error instanceof AdminApiError && error.status === 409)) {
+    return '계약을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+
+  return isEdit
+    ? '지금은 계약을 고칠 수 없습니다. 계약 상태를 확인해 주세요.'
+    : '이미 계약 중이거나 계약완료된 매물입니다. 또는 지금 계약을 만들 수 없는 미팅입니다.';
+}
+
+/** 계약 대상 매물. 새 계약이면 미팅 매물을 먼저 후보로 보여 주고 검색으로도 고른다. */
+function TargetListingField({
+  listing,
+  isLoading,
+  error,
+  suggestions,
+  onPick,
+  onClear,
+}: {
+  listing: TargetListing | null;
+  isLoading: boolean;
+  error: string;
+  suggestions: KkiruListingOption[];
+  onPick: (code: string) => void;
+  /** 없으면 매물을 바꿀 수 없다 (계약 수정) */
+  onClear?: () => void;
+}) {
+  let body: ReactNode;
+
+  if (listing) {
+    body = (
+      <div className="flex flex-wrap items-center gap-3 border border-[var(--brand)] bg-[var(--brand-soft)] px-3 py-2 text-sm">
+        <span className="font-mono text-xs">{listing.code}</span>
+        <span className="font-medium">{listing.name}</span>
+        <span className="text-xs text-[var(--muted)]">
+          보증금 {formatManwon(listing.deposit)} / 월 {formatManwon(listing.rent)} · 권리금{' '}
+          {formatManwon(listing.premium)}
+        </span>
+        {onClear ? (
+          <button
+            className="ml-auto cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+            onClick={onClear}
+            type="button"
+          >
+            다른 매물
+          </button>
+        ) : null}
+      </div>
+    );
+  } else if (isLoading) {
+    body = <p className="text-sm text-[var(--muted)]">매물을 불러오고 있습니다.</p>;
+  } else {
+    body = (
+      <KkiruListingPicker
+        disabledStatuses={BLOCKED_LISTING_STATUSES}
+        onPick={(picked) => onPick(picked.code)}
+        suggestions={suggestions}
+      />
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-5">
+      <FormField label="대상 매물" required>
+        <div className="flex flex-col gap-2">
+          {body}
+          {error ? (
+            <p className="text-xs text-[var(--error)]" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {listing && onClear && listing.status !== 'available' ? (
+            <p className="flex items-center gap-2 text-xs text-[var(--muted)]">
+              지금 매물 상태
+              <KkiruStatusBadge
+                label={LISTING_STATUS_LABELS[listing.status]}
+                status={listing.status}
+              />
+            </p>
+          ) : null}
+        </div>
+      </FormField>
+    </section>
+  );
 }
 
 function YesNo({
@@ -185,6 +360,12 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
   const idPrefix = useId();
   const isEdit = props.mode === 'edit';
   const target = describeTarget(props);
+  const initialListingCode = props.mode === 'create' ? (props.initialListingCode ?? null) : null;
+  const [listing, setListing] = useState<TargetListing | null>(
+    props.mode === 'edit' ? props.contract.listing : null,
+  );
+  const [isLoadingListing, setIsLoadingListing] = useState(false);
+  const [listingError, setListingError] = useState('');
   const [values, setValues] = useState(() => toValues(props));
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -194,8 +375,50 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
+  /** 보증금·계약금을 바꾸면 잔금을 직접 고치기 전까지 잔금 기본값도 바꾼다. */
+  function updateAmountForBalance(field: 'depositText' | 'downPaymentText', text: string) {
+    setValues((current) => withAutoBalance({ ...current, [field]: text }));
+  }
+
+  // 매물을 고르면 의뢰인 정보가 있는 전체 매물을 불러와 기본값을 채운다.
+  async function pickListing(code: string) {
+    setListingError('');
+    setIsLoadingListing(true);
+
+    try {
+      const picked = await getKkiruListing(code);
+
+      if (BLOCKED_LISTING_STATUSES.includes(picked.status)) {
+        setListingError(
+          `${picked.name}은(는) ${LISTING_STATUS_LABELS[picked.status]} 매물이라 고를 수 없습니다.`,
+        );
+        return;
+      }
+
+      setListing(picked);
+      setValues((current) => withListingDefaults(current, picked));
+    } catch {
+      setListingError('매물을 불러오지 못했습니다. 다시 골라 주세요.');
+    } finally {
+      setIsLoadingListing(false);
+    }
+  }
+
+  // 주소로 넘어온 매물(미팅 매물 줄의 계약 진행)은 미리 고른다.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 처음 한 번만 미리 고른다.
+  useEffect(() => {
+    if (initialListingCode) {
+      void pickListing(initialListingCode);
+    }
+  }, [initialListingCode]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!listing) {
+      setErrorMessage('대상 매물을 골라 주세요.');
+      return;
+    }
+
     const invalid = validate(values);
 
     if (invalid) {
@@ -207,17 +430,10 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
     setIsSubmitting(true);
 
     try {
-      const saved =
-        props.mode === 'edit'
-          ? await updateContract(props.contract.id, toInput(values))
-          : await createContract({ ...toInput(values), meetingId: props.meeting.id });
+      const saved = await saveContract(props, toInput(values), listing.id);
       router.push(`/kkiru/contracts/${saved.id}`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof AdminApiError && error.status === 409
-          ? '지금은 계약을 만들거나 고칠 수 없습니다. 미팅·계약 상태와, 이 매물에 다른 계약이 진행 중인지 확인해 주세요.'
-          : '계약을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      );
+      setErrorMessage(submitErrorText(error, isEdit));
       setIsSubmitting(false);
     }
   }
@@ -225,7 +441,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
   const cancelHref =
     props.mode === 'edit'
       ? `/kkiru/contracts/${props.contract.id}`
-      : `/kkiru/meetings/${props.meeting.id}`;
+      : `/kkiru/meetings/${props.meeting.code}`;
 
   return (
     <form
@@ -236,12 +452,30 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
       <p className="mb-6 bg-[var(--background)] px-4 py-3 text-sm">
         <span className="text-[var(--muted)]">케이스 </span>
         <span className="font-mono">{target.caseCode}</span>
-        <span className="text-[var(--muted)]"> · 대상 매물 </span>
-        {target.listing.name}
+        <span className="text-[var(--muted)]"> · </span>
+        {target.title}
+        <span className="text-[var(--muted)]"> · </span>
+        {target.customer.name}
       </p>
 
       <fieldset className="flex flex-col gap-8" disabled={isSubmitting}>
         <legend className="sr-only">계약 정보</legend>
+
+        <TargetListingField
+          error={listingError}
+          isLoading={isLoadingListing}
+          listing={listing}
+          onClear={
+            isEdit
+              ? undefined
+              : () => {
+                  setListing(null);
+                  setValues((current) => withListingDefaults(current, null));
+                }
+          }
+          onPick={(code) => void pickListing(code)}
+          suggestions={props.mode === 'create' ? props.meeting.listings : []}
+        />
 
         <section className="flex flex-col gap-5">
           <h3 className="text-xs font-medium text-[var(--muted)]">당사자</h3>
@@ -272,8 +506,8 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
                   onChange={(e) => update('sameAsClient', e.target.checked)}
                   type="checkbox"
                 />
-                매물 의뢰인과 동일 ({target.listing.clientName},{' '}
-                {formatPhone(target.listing.clientPhone)})
+                매물 의뢰인과 동일
+                {listing ? ` (${listing.clientName}, ${formatPhone(listing.clientPhone)})` : null}
               </label>
               {values.sameAsClient ? null : (
                 <div className="flex flex-wrap gap-2">
@@ -305,7 +539,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
           <FormField htmlFor={id('deposit')} label="보증금" required>
             <ManwonInput
               id={id('deposit')}
-              onChange={(text) => update('depositText', text)}
+              onChange={(text) => updateAmountForBalance('depositText', text)}
               required
               value={values.depositText}
             />
@@ -364,9 +598,30 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
           <FormField htmlFor={id('down')} label="계약금" required>
             <ManwonInput
               id={id('down')}
-              onChange={(text) => update('downPaymentText', text)}
+              onChange={(text) => updateAmountForBalance('downPaymentText', text)}
               required
               value={values.downPaymentText}
+            />
+          </FormField>
+          <FormField hint={balanceHint(values)} htmlFor={id('balance')} label="잔금" required>
+            <ManwonInput
+              id={id('balance')}
+              onChange={(text) =>
+                setValues((current) => ({ ...current, balanceEdited: true, balanceText: text }))
+              }
+              required
+              value={values.balanceText}
+            />
+          </FormField>
+          <FormField htmlFor={id('balance-due')} label="잔금일" required>
+            <input
+              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              id={id('balance-due')}
+              min={values.contractedOn || undefined}
+              onChange={(e) => update('balanceDueOn', e.target.value)}
+              required
+              type="date"
+              value={values.balanceDueOn}
             />
           </FormField>
           <FormField htmlFor={id('commission')} label="수수료" required>
@@ -409,7 +664,7 @@ export function KkiruContractForm(props: KkiruContractFormProps) {
           </Link>
           <button
             className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:opacity-60"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingListing}
             type="submit"
           >
             {isSubmitting ? '저장 중...' : isEdit ? '저장' : '계약 만들기'}

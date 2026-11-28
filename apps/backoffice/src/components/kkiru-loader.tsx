@@ -13,7 +13,7 @@ type KkiruLoaderProps<T> = {
   /** 주소 값(번호·ID). 바뀌면 다시 불러온다. */
   loadKey: string;
   load: (key: string) => Promise<T>;
-  /** 화면 문구에 쓰는 이름 (예: "상담") */
+  /** 화면 문구에 쓰는 이름 (예: "미팅") */
   noun: string;
   children: (data: T, replace: (next: T) => void) => ReactNode;
 };

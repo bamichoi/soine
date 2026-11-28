@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { BackToListLink } from '@/components/back-to-list-link';
 import { KkiruMeetingDetailView } from '@/components/kkiru-meeting-detail';
 import { PageTitleBar } from '@/components/page-title-bar';
-import { parseRouteId } from '@/lib/kkiru-route';
+import { parseRouteCode } from '@/lib/kkiru-route';
 
 export const metadata: Metadata = {
   title: '미팅 상세 | 끼루',
@@ -13,9 +13,9 @@ export const metadata: Metadata = {
 export default async function KkiruMeetingDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ code: string }>;
 }) {
-  const value = parseRouteId((await params).id);
+  const value = parseRouteCode((await params).code);
 
   if (!value) {
     notFound();
@@ -27,7 +27,7 @@ export default async function KkiruMeetingDetailPage({
       <Suspense>
         <div className="flex max-w-3xl flex-col gap-4">
           <PageTitleBar actions={<BackToListLink href="/kkiru/meetings" />} title="미팅 상세" />
-          <KkiruMeetingDetailView id={value} />
+          <KkiruMeetingDetailView code={value} />
         </div>
       </Suspense>
     </div>

@@ -16,6 +16,7 @@ import {
   type YearMonth,
 } from '@/lib/calendar';
 import { getSeoulToday, toSeoulDateAndTime } from '@/lib/choidolsang-inquiries-api';
+import { formatManwon } from '@/lib/kkiru-format';
 import { type KkiruScheduleItem, listKkiruSchedule } from '@/lib/kkiru-schedule-api';
 import { CONTRACT_STATUS_LABELS, MEETING_STATUS_LABELS } from '@/lib/kkiru-status';
 
@@ -27,14 +28,27 @@ const MAX_CHIPS_PER_DAY = 2;
 
 type ScheduleKind = KkiruScheduleItem['kind'];
 
-const KIND_LABELS: Record<ScheduleKind, string> = { contract: '계약', meeting: '미팅' };
+const KIND_LABELS: Record<ScheduleKind, string> = {
+  balance: '잔금',
+  contract: '계약',
+  meeting: '미팅',
+};
+
+/** 범례 순서와 문구 */
+const LEGEND: { kind: ScheduleKind; label: string }[] = [
+  { kind: 'meeting', label: '미팅 (미팅 일시)' },
+  { kind: 'contract', label: '계약 (계약일)' },
+  { kind: 'balance', label: '잔금 (잔금일)' },
+];
 
 const CHIP_CLASS_NAMES: Record<ScheduleKind, string> = {
+  balance: 'bg-[var(--warning-soft)] text-[var(--warning)]',
   contract: 'bg-[var(--success-soft)] text-[var(--success)]',
   meeting: 'bg-[var(--brand-soft)] text-[var(--brand)]',
 };
 
 const DOT_CLASS_NAMES: Record<ScheduleKind, string> = {
+  balance: 'bg-[var(--warning)]',
   contract: 'bg-[var(--success)]',
   meeting: 'bg-[var(--brand)]',
 };
@@ -52,13 +66,16 @@ function weekdayTextClass(weekday: number): string {
   return weekday === 6 ? 'text-[var(--brand)]' : '';
 }
 
-/** 미팅은 시각, 계약은 날짜만 있으므로 시각이 없다. */
+/** 미팅은 시각, 계약·잔금은 날짜만 있으므로 시각이 없다. */
 function getTime(item: KkiruScheduleItem): string | null {
   return item.kind === 'meeting' ? toSeoulDateAndTime(item.meetAt).time : null;
 }
 
+/** 미팅은 미팅 상세, 계약·잔금은 계약 상세 */
 function getHref(item: KkiruScheduleItem): string {
-  return item.kind === 'meeting' ? `/kkiru/meetings/${item.id}` : `/kkiru/contracts/${item.id}`;
+  return item.kind === 'meeting'
+    ? `/kkiru/meetings/${item.caseCode}`
+    : `/kkiru/contracts/${item.id}`;
 }
 
 function getStatusLabel(item: KkiruScheduleItem): string {
@@ -67,7 +84,12 @@ function getStatusLabel(item: KkiruScheduleItem): string {
     : CONTRACT_STATUS_LABELS[item.status];
 }
 
-// 날짜별로 묶는다. 하루 안에서는 계약(시각 없음)을 먼저, 미팅은 시각순으로 둔다.
+/** 미팅은 미팅 제목, 계약·잔금은 대상 매물 이름 */
+function getName(item: KkiruScheduleItem): string {
+  return item.kind === 'meeting' ? item.title : item.listingName;
+}
+
+// 날짜별로 묶는다. 하루 안에서는 계약·잔금(시각 없음)을 먼저, 미팅은 시각순으로 둔다.
 function groupByDate(items: KkiruScheduleItem[]): Map<string, KkiruScheduleItem[]> {
   const byDate = new Map<string, KkiruScheduleItem[]>();
   const sorted = [...items].sort((a, b) => (getTime(a) ?? '').localeCompare(getTime(b) ?? ''));
@@ -128,7 +150,7 @@ function DayCell({ day, isToday, isSelected, items, onSelect }: DayCellProps) {
           </span>
         ) : null}
 
-        {/* 넓은 화면: 시각(미팅)과 매물 이름 */}
+        {/* 넓은 화면: 시각(미팅)과 미팅 제목·매물 이름 */}
         <span aria-hidden="true" className="hidden w-full min-w-0 flex-col gap-0.5 sm:flex">
           {items.slice(0, MAX_CHIPS_PER_DAY).map((item) => (
             <span
@@ -136,7 +158,7 @@ function DayCell({ day, isToday, isSelected, items, onSelect }: DayCellProps) {
               key={`${item.kind}-${item.id}`}
             >
               <span className="tabular-nums">{getTime(item) ?? KIND_LABELS[item.kind]}</span>{' '}
-              {item.listingName}
+              {getName(item)}
             </span>
           ))}
           {hidden > 0 ? (
@@ -151,10 +173,10 @@ function DayCell({ day, isToday, isSelected, items, onSelect }: DayCellProps) {
 function CalendarLegend() {
   return (
     <ul aria-label="달력 색 안내" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-      {(['meeting', 'contract'] as const).map((kind) => (
+      {LEGEND.map(({ kind, label }) => (
         <li className="flex items-center gap-1.5" key={kind}>
           <span aria-hidden="true" className={`size-2.5 ${DOT_CLASS_NAMES[kind]}`} />
-          {kind === 'meeting' ? '미팅 (미팅 일시)' : '계약 (계약일)'}
+          {label}
         </li>
       ))}
       <li className="text-[var(--muted)]">진행중단 미팅과 취소된 계약은 표시하지 않음</li>
@@ -195,9 +217,10 @@ function DaySchedule({ date, state }: { date: string; state: LoadState }) {
                   </span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{item.listingName}</span>
+                  <span className="truncate">{getName(item)}</span>
                   <span className="truncate text-xs text-[var(--muted)]">
                     {item.customerName} · 케이스 {item.caseCode}
+                    {item.kind === 'balance' ? ` · 잔금 ${formatManwon(item.balance)}` : null}
                   </span>
                 </span>
                 <KkiruStatusBadge label={getStatusLabel(item)} status={item.status} />
@@ -211,7 +234,7 @@ function DaySchedule({ date, state }: { date: string; state: LoadState }) {
 }
 
 // 끼루 일정 달력. 보고 있는 달은 주소(?month=2026-11)에 남겨 새로고침해도 유지한다.
-// 미팅은 미팅 일시, 계약은 계약일 칸에 표시하고, 날짜를 누르면 아래에 그날 일정을 보여 준다.
+// 미팅은 미팅 일시, 계약은 계약일, 잔금은 잔금일 칸에 표시하고, 날짜를 누르면 아래에 그날 일정을 보여 준다.
 export function KkiruScheduleCalendar() {
   const router = useRouter();
   const pathname = usePathname();

@@ -22,10 +22,10 @@ const COLUMNS: ListColumn<KkiruCustomerSummary>[] = [
   },
   {
     firstOrder: 'desc',
-    key: 'consultationCount',
-    label: '상담',
-    render: (c) => <span className="whitespace-nowrap tabular-nums">{c.consultationCount}건</span>,
-    sortField: 'consultationCount',
+    key: 'meetingCount',
+    label: '미팅',
+    render: (c) => <span className="whitespace-nowrap tabular-nums">{c.meetingCount}건</span>,
+    sortField: 'meetingCount',
   },
   {
     firstOrder: 'desc',

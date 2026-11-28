@@ -10,6 +10,8 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateBy,
+  type ValidationArguments,
 } from 'class-validator';
 
 export function trimString({ value }: { value: unknown }) {
@@ -49,8 +51,32 @@ export function PhoneField() {
 }
 
 /** 날짜만 받는 항목 (YYYY-MM-DD) */
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export function DateOnlyField() {
-  return applyDecorators(Matches(/^\d{4}-\d{2}-\d{2}$/), IsISO8601({ strict: true }));
+  return applyDecorators(Matches(DATE_ONLY_PATTERN), IsISO8601({ strict: true }));
+}
+
+/**
+ * 날짜(YYYY-MM-DD)가 같은 객체의 다른 날짜 항목과 같거나 뒤여야 한다.
+ * 비교할 항목이 날짜 형식이 아니면 그 항목의 검증에 맡기고 여기서는 통과시킨다.
+ */
+export function NotBeforeDateField(property: string, message: string) {
+  return ValidateBy({
+    name: 'notBeforeDateField',
+    validator: {
+      defaultMessage: () => message,
+      validate: (value: unknown, args?: ValidationArguments) => {
+        const other = (args?.object as Record<string, unknown> | undefined)?.[property];
+
+        if (typeof value !== 'string' || typeof other !== 'string') {
+          return true;
+        }
+
+        return !DATE_ONLY_PATTERN.test(other) || value >= other;
+      },
+    },
+  });
 }
 
 /** 시간대가 있는 일시 (ISO 8601) */
@@ -103,4 +129,10 @@ export function toPagination(page: number, total: number) {
     total,
     totalPages: Math.max(1, Math.ceil(total / KKIRU_PAGE_SIZE)),
   };
+}
+
+/** 시각의 한국 날짜 (DATE 컬럼용, UTC 자정) */
+export function toSeoulDate(date: Date): Date {
+  const seoul = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return toDateOnly(seoul.toISOString().slice(0, 10));
 }

@@ -115,7 +115,7 @@ export function KkiruCustomerAddDialog({
 
   return (
     <Modal
-      description="고객으로 등록하고 이 상담의 고객으로 고릅니다."
+      description="고객으로 등록하고 이 미팅의 고객으로 고릅니다."
       footer={
         <>
           <button className={SECONDARY_BUTTON_CLASS_NAME} onClick={onClose} type="button">
@@ -135,7 +135,7 @@ export function KkiruCustomerAddDialog({
       onClose={onClose}
       title="고객 추가"
     >
-      {/* 상담 폼 안에 그려지므로 form을 겹쳐 쓰지 않는다. */}
+      {/* 미팅 폼 안에 그려지므로 form을 겹쳐 쓰지 않는다. */}
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5 text-sm" htmlFor={`${idPrefix}-name`}>
           <span className="font-medium">

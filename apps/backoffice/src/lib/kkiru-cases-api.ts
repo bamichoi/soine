@@ -1,13 +1,9 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
 import type { KkiruListingOption } from '@/lib/kkiru-listings-api';
-import type {
-  KkiruConsultationStatus,
-  KkiruContractStatus,
-  KkiruMeetingStatus,
-} from '@/lib/kkiru-status';
+import type { KkiruContractStatus, KkiruMeetingStatus } from '@/lib/kkiru-status';
 import { type ListQuery, type Paginated, withListParams } from '@/lib/list-query';
 
-// 끼루 상담·미팅·계약 API. 세 단계가 같은 케이스 번호를 쓴다.
+// 끼루 미팅·계약 API. 계약은 미팅의 케이스 번호를 함께 쓴다.
 
 export type { Paginated } from '@/lib/list-query';
 
@@ -24,61 +20,6 @@ export const INFLOW_SOURCE_LABELS: Record<InflowSource, string> = {
   other: '기타',
 };
 
-export type ConsultationSummary = {
-  id: string;
-  code: string;
-  title: string;
-  customer: CustomerRef;
-  interestArea: string;
-  desiredBusiness: string;
-  budget: number;
-  consultedOn: string;
-  status: KkiruConsultationStatus;
-};
-
-export type ConsultationDetail = ConsultationSummary & {
-  desiredPyeongMin: number;
-  desiredPyeongMax: number;
-  desiredFloor: string;
-  desiredRent: number;
-  maxDeposit: number;
-  maxPremium: number;
-  inflowSource: InflowSource;
-  inflowSourceDetail: string | null;
-  records: LogRecord[];
-  listings: (KkiruListingOption & { addedAt: string })[];
-  meetings: {
-    id: string;
-    listing: { code: string; name: string };
-    meetAt: string;
-    status: KkiruMeetingStatus;
-    /** 이 미팅의 계약 (최근 순, 취소된 계약 포함) */
-    contracts: { id: string; contractedOn: string; status: KkiruContractStatus }[];
-  }[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ConsultationFieldsInput = {
-  title: string;
-  interestArea: string;
-  desiredBusiness: string;
-  desiredPyeongMin: number;
-  desiredPyeongMax: number;
-  desiredFloor: string;
-  desiredRent: number;
-  maxDeposit: number;
-  maxPremium: number;
-  inflowSource: InflowSource;
-  inflowSourceDetail: string | null;
-  consultedOn: string;
-};
-
-export type CreateConsultationInput = ConsultationFieldsInput & {
-  customerCode: string;
-  content: string;
-};
-
 export type MeetingRecordKind = 'note' | 'stopped' | 'resumed' | 'contract_cancelled';
 
 export const MEETING_RECORD_KIND_LABELS: Record<MeetingRecordKind, string | null> = {
@@ -93,21 +34,70 @@ export type MeetingRecord = LogRecord & { kind: MeetingRecordKind };
 
 export type MeetingSummary = {
   id: string;
-  caseCode: string;
-  consultationTitle: string;
+  /** 케이스 번호 */
+  code: string;
+  title: string;
   customer: CustomerRef;
-  listing: { code: string; name: string };
+  interestArea: string;
+  desiredBusiness: string;
+  budget: number;
+  /** 미팅 일시 */
   meetAt: string;
   status: KkiruMeetingStatus;
 };
 
-export type MeetingDetail = Omit<MeetingSummary, 'listing'> & {
-  listing: KkiruListingOption & { clientName: string; clientPhone: string };
+export type MeetingContract = {
+  id: string;
+  contractedOn: string;
+  status: KkiruContractStatus;
+  listing: { id: string; code: string; name: string };
+};
+
+/** 미팅 매물. contractStatus는 이 매물로 이 미팅에서 만든 가장 최근 계약의 상태 */
+export type MeetingListing = KkiruListingOption & {
+  addedAt: string;
+  contractStatus: KkiruContractStatus | null;
+};
+
+export type MeetingDetail = MeetingSummary & {
+  desiredPyeongMin: number;
+  desiredPyeongMax: number;
+  desiredFloor: string;
+  desiredRent: number;
+  maxDeposit: number;
+  maxPremium: number;
+  inflowSource: InflowSource;
+  inflowSourceDetail: string | null;
+  stoppedAt: string | null;
   records: MeetingRecord[];
-  contracts: { id: string; contractedOn: string; status: KkiruContractStatus }[];
+  listings: MeetingListing[];
+  /** 이 미팅의 계약 (최근 순, 취소된 계약 포함) */
+  contracts: MeetingContract[];
+  /** 지금 새 계약을 만들 수 있는지 (미팅중이거나 계약이 취소된 뒤) */
   canStartContract: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type MeetingFieldsInput = {
+  title: string;
+  interestArea: string;
+  desiredBusiness: string;
+  desiredPyeongMin: number;
+  desiredPyeongMax: number;
+  desiredFloor: string;
+  desiredRent: number;
+  maxDeposit: number;
+  maxPremium: number;
+  inflowSource: InflowSource;
+  inflowSourceDetail: string | null;
+  /** 미팅 일시 (시간대 포함 ISO 8601) */
+  meetAt: string;
+};
+
+export type CreateMeetingInput = MeetingFieldsInput & {
+  customerCode: string;
+  content: string;
 };
 
 export type ContractSummary = {
@@ -117,20 +107,15 @@ export type ContractSummary = {
   customer: CustomerRef;
   listing: { code: string; name: string };
   commission: number;
+  /** 잔금(만원) */
+  balance: number;
+  /** 잔금일 (YYYY-MM-DD) */
+  balanceDueOn: string;
   status: KkiruContractStatus;
 };
 
-export type ContractHistoryEntry = {
-  id: string;
-  source: 'consultation' | 'meeting';
-  kind: MeetingRecordKind;
-  recordedOn: string;
-  content: string;
-};
-
 export type ContractDetail = Omit<ContractSummary, 'listing'> & {
-  consultation: { code: string; title: string };
-  meetingId: string;
+  meeting: { code: string; title: string };
   listing: KkiruListingOption & { clientName: string; clientPhone: string };
   landlordName: string;
   landlordPhone: string;
@@ -146,7 +131,8 @@ export type ContractDetail = Omit<ContractSummary, 'listing'> & {
   cancelReason: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
-  history: ContractHistoryEntry[];
+  /** 계약 히스토리: 이 계약이 속한 미팅의 로그 (날짜순) */
+  history: MeetingRecord[];
   createdAt: string;
   updatedAt: string;
 };
@@ -163,6 +149,8 @@ export type ContractFieldsInput = {
   leaseEndOn: string;
   specialTerms: string | null;
   downPayment: number;
+  balance: number;
+  balanceDueOn: string;
   commission: number;
   isMyListing: boolean;
   isMyClient: boolean;
@@ -188,58 +176,33 @@ async function sendJson<T>(
   return (await response.json()) as T;
 }
 
-// 상담
-const CONSULTATIONS = 'kkiru/consultations';
-const consultationPath = (code: string) => `${CONSULTATIONS}/${encodeURIComponent(code)}`;
-
-export const listConsultations = (query: ListQuery) =>
-  getJson<Paginated<ConsultationSummary>>(withListParams(CONSULTATIONS, query));
-export const getConsultation = (code: string) =>
-  getJson<ConsultationDetail>(consultationPath(code));
-export const createConsultation = (input: CreateConsultationInput) =>
-  sendJson<ConsultationDetail>(CONSULTATIONS, 'POST', input);
-export const updateConsultation = (code: string, input: ConsultationFieldsInput) =>
-  sendJson<ConsultationDetail>(consultationPath(code), 'PATCH', input);
-export const addConsultationRecord = (
-  code: string,
-  input: { recordedOn: string; content: string },
-) => sendJson<ConsultationDetail>(`${consultationPath(code)}/records`, 'POST', input);
-export const updateConsultationRecord = (
-  code: string,
-  recordId: string,
-  input: { recordedOn: string; content: string },
-) => sendJson<ConsultationDetail>(`${consultationPath(code)}/records/${recordId}`, 'PATCH', input);
-export const addConsultationListing = (code: string, listingId: string) =>
-  sendJson<ConsultationDetail>(`${consultationPath(code)}/listings`, 'POST', { listingId });
-/** 상담매물 빼기: 상담과 매물의 연결만 끊는다. */
-export const removeConsultationListing = (code: string, listingId: string) =>
-  sendJson<ConsultationDetail>(`${consultationPath(code)}/listings/${listingId}`, 'DELETE');
-
 // 미팅
 const MEETINGS = 'kkiru/meetings';
+const meetingPath = (code: string) => `${MEETINGS}/${encodeURIComponent(code)}`;
 
 export const listMeetings = (query: ListQuery) =>
   getJson<Paginated<MeetingSummary>>(withListParams(MEETINGS, query));
-export const getMeeting = (id: string) => getJson<MeetingDetail>(`${MEETINGS}/${id}`);
-export const createMeeting = (input: {
-  consultationCode: string;
-  listingId: string;
-  meetAt: string;
-  content: string;
-}) => sendJson<MeetingDetail>(MEETINGS, 'POST', input);
-export const updateMeeting = (id: string, input: { listingId: string; meetAt: string }) =>
-  sendJson<MeetingDetail>(`${MEETINGS}/${id}`, 'PATCH', input);
-export const addMeetingRecord = (id: string, input: { recordedOn: string; content: string }) =>
-  sendJson<MeetingDetail>(`${MEETINGS}/${id}/records`, 'POST', input);
+export const getMeeting = (code: string) => getJson<MeetingDetail>(meetingPath(code));
+export const createMeeting = (input: CreateMeetingInput) =>
+  sendJson<MeetingDetail>(MEETINGS, 'POST', input);
+export const updateMeeting = (code: string, input: MeetingFieldsInput) =>
+  sendJson<MeetingDetail>(meetingPath(code), 'PATCH', input);
+export const addMeetingRecord = (code: string, input: { recordedOn: string; content: string }) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/records`, 'POST', input);
 export const updateMeetingRecord = (
-  id: string,
+  code: string,
   recordId: string,
   input: { recordedOn: string; content: string },
-) => sendJson<MeetingDetail>(`${MEETINGS}/${id}/records/${recordId}`, 'PATCH', input);
-export const stopMeeting = (id: string, reason: string) =>
-  sendJson<MeetingDetail>(`${MEETINGS}/${id}/stop`, 'POST', { reason });
-export const resumeMeeting = (id: string, reason: string) =>
-  sendJson<MeetingDetail>(`${MEETINGS}/${id}/resume`, 'POST', { reason });
+) => sendJson<MeetingDetail>(`${meetingPath(code)}/records/${recordId}`, 'PATCH', input);
+export const addMeetingListing = (code: string, listingId: string) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/listings`, 'POST', { listingId });
+/** 미팅 매물 빼기: 미팅과 매물의 연결만 끊는다. 계약이 걸린 매물은 뺄 수 없다(409). */
+export const removeMeetingListing = (code: string, listingId: string) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/listings/${listingId}`, 'DELETE');
+export const stopMeeting = (code: string, reason: string) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/stop`, 'POST', { reason });
+export const resumeMeeting = (code: string, reason: string) =>
+  sendJson<MeetingDetail>(`${meetingPath(code)}/resume`, 'POST', { reason });
 
 // 계약
 const CONTRACTS = 'kkiru/contracts';
@@ -247,8 +210,10 @@ const CONTRACTS = 'kkiru/contracts';
 export const listContracts = (query: ListQuery) =>
   getJson<Paginated<ContractSummary>>(withListParams(CONTRACTS, query));
 export const getContract = (id: string) => getJson<ContractDetail>(`${CONTRACTS}/${id}`);
-export const createContract = (input: ContractFieldsInput & { meetingId: string }) =>
-  sendJson<ContractDetail>(CONTRACTS, 'POST', input);
+/** 계약 진행: 미팅에서 매물 하나로 계약을 만든다. 미팅 매물에 없던 매물이면 함께 더한다. */
+export const createContract = (
+  input: ContractFieldsInput & { meetingCode: string; listingId: string },
+) => sendJson<ContractDetail>(CONTRACTS, 'POST', input);
 export const updateContract = (id: string, input: ContractFieldsInput) =>
   sendJson<ContractDetail>(`${CONTRACTS}/${id}`, 'PATCH', input);
 export const completeContract = (id: string) =>

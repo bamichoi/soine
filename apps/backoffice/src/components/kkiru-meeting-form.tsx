@@ -4,197 +4,432 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useId, useState } from 'react';
 import { FormField } from '@/components/form-field';
-import { KkiruListingPicker } from '@/components/kkiru-listing-picker';
+import { KkiruCustomerPicker, type PickedCustomer } from '@/components/kkiru-customer-picker';
+import { ManwonInput } from '@/components/manwon-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import { getSeoulToday, toSeoulDateAndTime } from '@/lib/choidolsang-inquiries-api';
 import {
-  type ConsultationDetail,
   createMeeting,
+  INFLOW_SOURCE_LABELS,
+  type InflowSource,
   type MeetingDetail,
+  type MeetingFieldsInput,
   updateMeeting,
 } from '@/lib/kkiru-cases-api';
-import { formatManwon } from '@/lib/kkiru-format';
-import type { KkiruListingOption } from '@/lib/kkiru-listings-api';
+import {
+  formatDecimal,
+  formatManwon,
+  parseDecimalText,
+  parseManwonText,
+  pyeongToSquareMeters,
+  toDecimalText,
+  toManwonText,
+} from '@/lib/kkiru-format';
 
 const CONTROL_CLASS_NAME =
   'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
-type KkiruMeetingFormProps =
-  | { mode: 'create'; consultation: ConsultationDetail }
-  | { mode: 'edit'; meeting: MeetingDetail };
+const INFLOW_SOURCES: InflowSource[] = ['naver_land', 'instagram', 'other'];
 
-function errorText(error: unknown): string {
-  if (error instanceof AdminApiError && error.status === 409) {
-    return '이미 계약완료된 매물이거나, 계약이 진행된 미팅이라 매물을 바꿀 수 없습니다.';
+type FormValues = {
+  customer: PickedCustomer | null;
+  title: string;
+  interestArea: string;
+  desiredBusiness: string;
+  pyeongMinText: string;
+  pyeongMaxText: string;
+  desiredFloor: string;
+  rentText: string;
+  depositText: string;
+  premiumText: string;
+  inflowSource: InflowSource | null;
+  inflowSourceDetail: string;
+  meetDate: string;
+  meetTime: string;
+  content: string;
+};
+
+function toValues(meeting?: MeetingDetail): FormValues {
+  if (!meeting) {
+    return {
+      content: '',
+      customer: null,
+      depositText: '',
+      desiredBusiness: '',
+      desiredFloor: '',
+      inflowSource: null,
+      inflowSourceDetail: '',
+      interestArea: '',
+      meetDate: getSeoulToday(),
+      meetTime: '',
+      premiumText: '',
+      pyeongMaxText: '',
+      pyeongMinText: '',
+      rentText: '',
+      title: '',
+    };
   }
 
+  const meetAt = toSeoulDateAndTime(meeting.meetAt);
+
+  return {
+    content: '',
+    customer: meeting.customer,
+    depositText: toManwonText(String(meeting.maxDeposit)),
+    desiredBusiness: meeting.desiredBusiness,
+    desiredFloor: meeting.desiredFloor,
+    inflowSource: meeting.inflowSource,
+    inflowSourceDetail: meeting.inflowSourceDetail ?? '',
+    interestArea: meeting.interestArea,
+    meetDate: meetAt.date,
+    meetTime: meetAt.time,
+    premiumText: toManwonText(String(meeting.maxPremium)),
+    pyeongMaxText: String(meeting.desiredPyeongMax),
+    pyeongMinText: String(meeting.desiredPyeongMin),
+    rentText: toManwonText(String(meeting.desiredRent)),
+    title: meeting.title,
+  };
+}
+
+function firstMissing(values: FormValues, isEdit: boolean): string | null {
+  const required: [boolean, string][] = [
+    [values.customer !== null, '고객 찾기나 고객 추가로 고객을 골라 주세요.'],
+    [Boolean(values.title.trim()), '제목을 입력해 주세요.'],
+    [Boolean(values.meetDate && values.meetTime), '미팅 날짜와 시간을 입력해 주세요.'],
+    [Boolean(values.interestArea.trim()), '관심 상권을 입력해 주세요.'],
+    [Boolean(values.desiredBusiness.trim()), '희망 업종을 입력해 주세요.'],
+    [Boolean(values.desiredFloor.trim()), '희망 층수를 입력해 주세요.'],
+    [Boolean(values.inflowSource), '유입 경로를 골라 주세요.'],
+    [
+      values.inflowSource !== 'other' || Boolean(values.inflowSourceDetail.trim()),
+      '기타 유입 경로를 적어 주세요.',
+    ],
+    [isEdit || Boolean(values.content.trim()), '미팅 내용을 입력해 주세요.'],
+  ];
+
+  return required.find(([ok]) => !ok)?.[1] ?? null;
+}
+
+function buildFields(values: FormValues, isEdit: boolean): MeetingFieldsInput | string {
+  const missing = firstMissing(values, isEdit);
+
+  if (missing) {
+    return missing;
+  }
+
+  const min = parseDecimalText(values.pyeongMinText);
+  const max = parseDecimalText(values.pyeongMaxText);
+
+  if (!(min && max)) {
+    return '희망 평수 범위를 입력해 주세요.';
+  }
+
+  if (min > max) {
+    return '희망 평수는 작은 값부터 큰 값 순서로 입력해 주세요.';
+  }
+
+  const amounts = [values.rentText, values.depositText, values.premiumText].map(parseManwonText);
+
+  if (amounts.some((amount) => amount === null)) {
+    return '희망 임대료·최대 보증금·최대 권리금을 입력해 주세요. 없으면 0을 넣어 주세요.';
+  }
+
+  const [desiredRent, maxDeposit, maxPremium] = amounts as number[];
+
+  return {
+    desiredBusiness: values.desiredBusiness.trim(),
+    desiredFloor: values.desiredFloor.trim(),
+    desiredPyeongMax: max,
+    desiredPyeongMin: min,
+    desiredRent,
+    inflowSource: values.inflowSource as InflowSource,
+    inflowSourceDetail: values.inflowSource === 'other' ? values.inflowSourceDetail.trim() : null,
+    interestArea: values.interestArea.trim(),
+    maxDeposit,
+    maxPremium,
+    meetAt: `${values.meetDate}T${values.meetTime}:00+09:00`,
+    title: values.title.trim(),
+  };
+}
+
+function submitErrorText(error: unknown): string {
   return error instanceof AdminApiError && error.status === 400
     ? '입력한 내용을 다시 확인해 주세요.'
     : '미팅을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-function validateMeeting(values: {
-  listing: KkiruListingOption | null;
-  date: string;
-  time: string;
-  content: string;
-  isEdit: boolean;
-}): string | null {
-  if (!values.listing) {
-    return '대상 매물을 골라 주세요.';
-  }
+function PyeongRange({
+  idPrefix,
+  values,
+  onChange,
+}: {
+  idPrefix: string;
+  values: FormValues;
+  onChange: (field: 'pyeongMinText' | 'pyeongMaxText', text: string) => void;
+}) {
+  const min = parseDecimalText(values.pyeongMinText);
+  const max = parseDecimalText(values.pyeongMaxText);
+  const input = (field: 'pyeongMinText' | 'pyeongMaxText', label: string) => (
+    <div className="relative w-28">
+      <input
+        aria-label={label}
+        className={`${CONTROL_CLASS_NAME} pr-8 text-right tabular-nums`}
+        id={field === 'pyeongMinText' ? `${idPrefix}-pyeong` : undefined}
+        inputMode="decimal"
+        onChange={(event) => onChange(field, toDecimalText(event.target.value))}
+        required
+        value={values[field]}
+      />
+      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
+        평
+      </span>
+    </div>
+  );
 
-  if (!(values.date && values.time)) {
-    return '미팅 날짜와 시간을 입력해 주세요.';
-  }
-
-  return values.isEdit || values.content.trim() ? null : '미팅 내용을 입력해 주세요.';
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {input('pyeongMinText', '희망 평수 최소')}
+      <span className="text-[var(--muted)]">~</span>
+      {input('pyeongMaxText', '희망 평수 최대')}
+      <span className="text-sm text-[var(--muted)] tabular-nums">
+        {min && max
+          ? `약 ${formatDecimal(pyeongToSquareMeters(min))}~${formatDecimal(pyeongToSquareMeters(max))}㎡`
+          : '㎡로 환산해 보여 줍니다'}
+      </span>
+    </div>
+  );
 }
 
-function describeTarget(props: KkiruMeetingFormProps) {
-  if (props.mode === 'edit') {
-    return {
-      caseCode: props.meeting.caseCode,
-      customerName: props.meeting.customer.name,
-      title: props.meeting.consultationTitle,
-    };
-  }
-
-  return {
-    caseCode: props.consultation.code,
-    customerName: props.consultation.customer.name,
-    title: props.consultation.title,
-  };
-}
-
-export function KkiruMeetingForm(props: KkiruMeetingFormProps) {
+export function KkiruMeetingForm({
+  meeting,
+  initialCustomerCode,
+}: {
+  meeting?: MeetingDetail;
+  initialCustomerCode?: string | null;
+}) {
   const router = useRouter();
   const idPrefix = useId();
-  const isEdit = props.mode === 'edit';
-  const initialAt = isEdit
-    ? toSeoulDateAndTime(props.meeting.meetAt)
-    : { date: getSeoulToday(), time: '' };
-  const [listing, setListing] = useState<KkiruListingOption | null>(
-    isEdit ? props.meeting.listing : null,
-  );
-  const [date, setDate] = useState(initialAt.date);
-  const [time, setTime] = useState(initialAt.time);
-  const [content, setContent] = useState('');
+  const isEdit = meeting !== undefined;
+  const [values, setValues] = useState(() => toValues(meeting));
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const canChangeListing = !isEdit || ['meeting', 'stopped'].includes(props.meeting.status);
-  const { caseCode, customerName, title } = describeTarget(props);
-  const cancelHref = isEdit
-    ? `/kkiru/meetings/${props.meeting.id}`
-    : `/kkiru/consultations/${caseCode}`;
+  const id = (field: string) => `${idPrefix}-${field}`;
+  const budget =
+    (parseManwonText(values.depositText) ?? 0) + (parseManwonText(values.premiumText) ?? 0);
+
+  function update<K extends keyof FormValues>(field: K, value: FormValues[K]) {
+    setValues((current) => ({ ...current, [field]: value }));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const fields = buildFields(values, isEdit);
 
-    const invalid = validateMeeting({ content, date, isEdit, listing, time });
-
-    if (invalid || !listing) {
-      setErrorMessage(invalid ?? '대상 매물을 골라 주세요.');
+    if (typeof fields === 'string') {
+      setErrorMessage(fields);
       return;
     }
 
-    const meetAt = `${date}T${time}:00+09:00`;
     setErrorMessage('');
     setIsSubmitting(true);
 
     try {
       const saved = isEdit
-        ? await updateMeeting(props.meeting.id, { listingId: listing.id, meetAt })
+        ? await updateMeeting(meeting.code, fields)
         : await createMeeting({
-            consultationCode: caseCode,
-            content: content.trim(),
-            listingId: listing.id,
-            meetAt,
+            ...fields,
+            content: values.content.trim(),
+            customerCode: (values.customer as PickedCustomer).code,
           });
-      router.push(`/kkiru/meetings/${saved.id}`);
+      router.push(`/kkiru/meetings/${saved.code}`);
     } catch (error) {
-      setErrorMessage(errorText(error));
+      setErrorMessage(submitErrorText(error));
       setIsSubmitting(false);
     }
   }
 
   return (
     <form
-      aria-label={isEdit ? '미팅 수정' : '미팅 진행'}
+      aria-label={isEdit ? '미팅 수정' : '새 미팅'}
       className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
       onSubmit={handleSubmit}
     >
-      <p className="mb-6 bg-[var(--background)] px-4 py-3 text-sm">
-        <span className="text-[var(--muted)]">케이스 </span>
-        <span className="font-mono">{caseCode}</span>
-        <span className="text-[var(--muted)]"> · </span>
-        {title}
-        <span className="text-[var(--muted)]"> · </span>
-        {customerName}
-      </p>
-
-      <fieldset className="flex flex-col gap-5" disabled={isSubmitting}>
+      <fieldset className="flex flex-col gap-8" disabled={isSubmitting}>
         <legend className="sr-only">미팅 정보</legend>
-        <FormField label="대상 매물" required>
-          <div className="flex flex-col gap-2">
-            {listing ? (
-              <div className="flex flex-wrap items-center gap-3 border border-[var(--brand)] bg-[var(--brand-soft)] px-3 py-2 text-sm">
-                <span className="font-mono text-xs">{listing.code}</span>
-                <span className="font-medium">{listing.name}</span>
-                <span className="text-xs text-[var(--muted)]">
-                  보증금 {formatManwon(listing.deposit)} / 월 {formatManwon(listing.rent)}
+
+        <section className="flex flex-col gap-5">
+          <h3 className="text-xs font-medium text-[var(--muted)]">고객</h3>
+          <FormField label="고객" required>
+            {isEdit ? (
+              <p className="flex h-10 items-center gap-3 text-sm">
+                {meeting.customer.name}
+                <span className="font-mono text-xs text-[var(--muted)]">
+                  {meeting.customer.code}
                 </span>
-                {canChangeListing ? (
-                  <button
-                    className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
-                    onClick={() => setListing(null)}
-                    type="button"
-                  >
-                    다른 매물
-                  </button>
-                ) : null}
-              </div>
+              </p>
             ) : (
-              <KkiruListingPicker
-                onPick={setListing}
-                suggestions={isEdit ? [] : props.consultation.listings}
+              <KkiruCustomerPicker
+                initialCode={initialCustomerCode}
+                onChange={(customer) => update('customer', customer)}
+                value={values.customer}
               />
             )}
-          </div>
-        </FormField>
-        <FormField htmlFor={`${idPrefix}-date`} label="미팅 일시" required>
-          <div className="flex flex-wrap gap-2">
+          </FormField>
+          <FormField htmlFor={id('title')} label="제목" required>
             <input
-              aria-label="미팅 날짜"
-              className={`${CONTROL_CLASS_NAME} sm:w-48`}
-              id={`${idPrefix}-date`}
-              onChange={(e) => setDate(e.target.value)}
+              className={CONTROL_CLASS_NAME}
+              id={id('title')}
+              maxLength={100}
+              onChange={(e) => update('title', e.target.value)}
+              placeholder="예: 연남동 카페 자리"
               required
-              type="date"
-              value={date}
-            />
-            <input
-              aria-label="미팅 시간"
-              className={`${CONTROL_CLASS_NAME} sm:w-36`}
-              onChange={(e) => setTime(e.target.value)}
-              required
-              step={600}
-              type="time"
-              value={time}
-            />
-          </div>
-        </FormField>
-        {isEdit ? null : (
-          <FormField htmlFor={`${idPrefix}-content`} label="미팅 내용" required>
-            <textarea
-              className={`${CONTROL_CLASS_NAME} h-auto min-h-32 resize-y py-2.5 leading-relaxed`}
-              id={`${idPrefix}-content`}
-              maxLength={5000}
-              onChange={(e) => setContent(e.target.value)}
-              required
-              value={content}
+              value={values.title}
             />
           </FormField>
+          <FormField htmlFor={id('meet-date')} label="미팅 일시" required>
+            <div className="flex flex-wrap gap-2">
+              <input
+                aria-label="미팅 날짜"
+                className={`${CONTROL_CLASS_NAME} sm:w-48`}
+                id={id('meet-date')}
+                onChange={(e) => update('meetDate', e.target.value)}
+                required
+                type="date"
+                value={values.meetDate}
+              />
+              <input
+                aria-label="미팅 시간"
+                className={`${CONTROL_CLASS_NAME} sm:w-36`}
+                onChange={(e) => update('meetTime', e.target.value)}
+                required
+                step={600}
+                type="time"
+                value={values.meetTime}
+              />
+            </div>
+          </FormField>
+          <FormField label="유입 경로" required>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {INFLOW_SOURCES.map((source) => (
+                  <button
+                    aria-pressed={values.inflowSource === source}
+                    className={`h-10 border px-4 text-sm ${
+                      values.inflowSource === source
+                        ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                        : 'border-[var(--line)] hover:bg-[var(--background)]'
+                    }`}
+                    key={source}
+                    onClick={() => update('inflowSource', source)}
+                    type="button"
+                  >
+                    {INFLOW_SOURCE_LABELS[source]}
+                  </button>
+                ))}
+              </div>
+              {values.inflowSource === 'other' ? (
+                <input
+                  aria-label="기타 유입 경로"
+                  className={`${CONTROL_CLASS_NAME} sm:w-64`}
+                  maxLength={100}
+                  onChange={(e) => update('inflowSourceDetail', e.target.value)}
+                  placeholder="유입 경로 직접 입력"
+                  value={values.inflowSourceDetail}
+                />
+              ) : null}
+            </div>
+          </FormField>
+        </section>
+
+        <section className="flex flex-col gap-5">
+          <h3 className="text-xs font-medium text-[var(--muted)]">희망 조건</h3>
+          <FormField htmlFor={id('area')} label="관심 상권" required>
+            <input
+              className={CONTROL_CLASS_NAME}
+              id={id('area')}
+              maxLength={200}
+              onChange={(e) => update('interestArea', e.target.value)}
+              required
+              value={values.interestArea}
+            />
+          </FormField>
+          <FormField htmlFor={id('business')} label="희망 업종" required>
+            <input
+              className={CONTROL_CLASS_NAME}
+              id={id('business')}
+              maxLength={200}
+              onChange={(e) => update('desiredBusiness', e.target.value)}
+              required
+              value={values.desiredBusiness}
+            />
+          </FormField>
+          <FormField htmlFor={id('pyeong')} label="희망 평수" required>
+            <PyeongRange
+              idPrefix={idPrefix}
+              onChange={(field, text) => update(field, text)}
+              values={values}
+            />
+          </FormField>
+          <FormField htmlFor={id('floor')} label="희망 층수" required>
+            <input
+              className={`${CONTROL_CLASS_NAME} sm:w-48`}
+              id={id('floor')}
+              maxLength={50}
+              onChange={(e) => update('desiredFloor', e.target.value)}
+              placeholder="예: 1층, 1~2층"
+              required
+              value={values.desiredFloor}
+            />
+          </FormField>
+        </section>
+
+        <section className="flex flex-col gap-5">
+          <h3 className="text-xs font-medium text-[var(--muted)]">금액</h3>
+          <FormField htmlFor={id('rent')} label="희망 임대료" required>
+            <ManwonInput
+              id={id('rent')}
+              onChange={(text) => update('rentText', text)}
+              required
+              value={values.rentText}
+            />
+          </FormField>
+          <FormField htmlFor={id('deposit')} label="최대 가용 보증금" required>
+            <ManwonInput
+              id={id('deposit')}
+              onChange={(text) => update('depositText', text)}
+              required
+              value={values.depositText}
+            />
+          </FormField>
+          <FormField htmlFor={id('premium')} label="최대 가용 권리금" required>
+            <ManwonInput
+              id={id('premium')}
+              onChange={(text) => update('premiumText', text)}
+              required
+              value={values.premiumText}
+            />
+          </FormField>
+          <FormField label="예산">
+            <p className="flex h-10 items-center text-sm font-medium tabular-nums sm:w-56 sm:justify-end">
+              {formatManwon(budget)}
+            </p>
+          </FormField>
+        </section>
+
+        {isEdit ? null : (
+          <section className="flex flex-col gap-5">
+            <h3 className="text-xs font-medium text-[var(--muted)]">미팅 내용</h3>
+            <FormField htmlFor={id('content')} label="미팅 내용" required>
+              <textarea
+                className={`${CONTROL_CLASS_NAME} h-auto min-h-40 resize-y py-2.5 leading-relaxed`}
+                id={id('content')}
+                maxLength={5000}
+                onChange={(e) => update('content', e.target.value)}
+                required
+                value={values.content}
+              />
+            </FormField>
+          </section>
         )}
       </fieldset>
 
@@ -207,12 +442,12 @@ export function KkiruMeetingForm(props: KkiruMeetingFormProps) {
         <div className="flex justify-end gap-2">
           <Link
             className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
+            href={isEdit ? `/kkiru/meetings/${meeting.code}` : '/kkiru/meetings'}
           >
             취소
           </Link>
           <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:opacity-60"
+            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting}
             type="submit"
           >

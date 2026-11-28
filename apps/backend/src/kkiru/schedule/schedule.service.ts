@@ -16,7 +16,7 @@ const SCHEDULED_MEETING_STATUSES: KkiruMeetingStatus[] = [
   'contracted',
   'contract_cancelled',
 ];
-/** 달력에 보이는 계약 상태. 취소된 계약은 보이지 않는다. */
+/** 달력에 보이는 계약 상태. 취소된 계약은 계약·잔금 둘 다 보이지 않는다. */
 const SCHEDULED_CONTRACT_STATUSES: KkiruContractStatus[] = ['contracting', 'completed'];
 
 export type ScheduleItem =
@@ -28,9 +28,11 @@ export type ScheduleItem =
       /** 미팅 일시 */
       meetAt: string;
       status: KkiruMeetingStatus;
+      /** 케이스 번호 (미팅 주소에 쓴다) */
       caseCode: string;
       customerName: string;
-      listingName: string;
+      /** 미팅 제목 */
+      title: string;
     }
   | {
       kind: 'contract';
@@ -41,6 +43,20 @@ export type ScheduleItem =
       caseCode: string;
       customerName: string;
       listingName: string;
+    }
+  | {
+      kind: 'balance';
+      /** 계약 id (계약 상세 주소에 쓴다) */
+      id: string;
+      /** 잔금일 (YYYY-MM-DD) */
+      date: string;
+      /** 계약 상태 */
+      status: KkiruContractStatus;
+      caseCode: string;
+      customerName: string;
+      listingName: string;
+      /** 잔금(만원) */
+      balance: number;
     };
 
 function seoulDateRangeToInstants(from: string, to: string) {
@@ -54,16 +70,25 @@ function toSeoulDateString(date: Date): string {
   return new Date(date.getTime() + SEOUL_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-const CASE_INCLUDE = {
-  consultation: { select: { code: true, customer: { select: { name: true } } } },
+const MEETING_SELECT = {
+  code: true,
+  customer: { select: { name: true } },
+  id: true,
+  meetAt: true,
+  status: true,
+  title: true,
+} as const;
+
+const CONTRACT_INCLUDE = {
   listing: { select: { name: true } },
+  meeting: { select: { code: true, customer: { select: { name: true } } } },
 } as const;
 
 @Injectable()
 export class KkiruScheduleService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 기간 안의 미팅(미팅 일시 기준)과 계약(계약일 기준)을 시간순으로 돌려준다. */
+  /** 기간 안의 미팅(미팅 일시 기준), 계약(계약일 기준), 잔금(잔금일 기준)을 시간순으로 돌려준다. */
   async list({ from, to }: ScheduleQueryDto): Promise<ScheduleItem[]> {
     const days = (toDateOnly(to).getTime() - toDateOnly(from).getTime()) / (24 * 60 * 60 * 1000);
 
@@ -71,46 +96,61 @@ export class KkiruScheduleService {
       throw new BadRequestException(`Range must be 1 to ${MAX_RANGE_DAYS} days`);
     }
 
-    const [meetings, contracts] = await this.prisma.$transaction([
+    const dateRange = { gte: toDateOnly(from), lt: toDateOnly(to) };
+    const [meetings, contracts, balances] = await this.prisma.$transaction([
       this.prisma.kkiruMeeting.findMany({
-        include: CASE_INCLUDE,
         orderBy: [{ meetAt: 'asc' }, { id: 'asc' }],
+        select: MEETING_SELECT,
         where: {
           meetAt: seoulDateRangeToInstants(from, to),
           status: { in: SCHEDULED_MEETING_STATUSES },
         },
       }),
       this.prisma.kkiruContract.findMany({
-        include: { meeting: { include: CASE_INCLUDE } },
+        include: CONTRACT_INCLUDE,
         orderBy: [{ contractedOn: 'asc' }, { createdAt: 'asc' }],
-        where: {
-          contractedOn: { gte: toDateOnly(from), lt: toDateOnly(to) },
-          status: { in: SCHEDULED_CONTRACT_STATUSES },
-        },
+        where: { contractedOn: dateRange, status: { in: SCHEDULED_CONTRACT_STATUSES } },
+      }),
+      this.prisma.kkiruContract.findMany({
+        include: CONTRACT_INCLUDE,
+        orderBy: [{ balanceDueOn: 'asc' }, { createdAt: 'asc' }],
+        where: { balanceDueOn: dateRange, status: { in: SCHEDULED_CONTRACT_STATUSES } },
       }),
     ]);
 
     return [
       ...meetings.map(
         (meeting): ScheduleItem => ({
-          caseCode: meeting.consultation.code,
-          customerName: meeting.consultation.customer.name,
+          caseCode: meeting.code,
+          customerName: meeting.customer.name,
           date: toSeoulDateString(meeting.meetAt),
           id: meeting.id,
           kind: 'meeting',
-          listingName: meeting.listing.name,
           meetAt: meeting.meetAt.toISOString(),
           status: meeting.status,
+          title: meeting.title,
         }),
       ),
       ...contracts.map(
         (contract): ScheduleItem => ({
-          caseCode: contract.meeting.consultation.code,
-          customerName: contract.meeting.consultation.customer.name,
+          caseCode: contract.meeting.code,
+          customerName: contract.meeting.customer.name,
           date: toDateString(contract.contractedOn),
           id: contract.id,
           kind: 'contract',
-          listingName: contract.meeting.listing.name,
+          listingName: contract.listing.name,
+          status: contract.status,
+        }),
+      ),
+      ...balances.map(
+        (contract): ScheduleItem => ({
+          balance: contract.balance,
+          caseCode: contract.meeting.code,
+          customerName: contract.meeting.customer.name,
+          date: toDateString(contract.balanceDueOn),
+          id: contract.id,
+          kind: 'balance',
+          listingName: contract.listing.name,
           status: contract.status,
         }),
       ),

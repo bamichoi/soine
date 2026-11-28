@@ -1,5 +1,5 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
-import type { KkiruConsultationStatus } from '@/lib/kkiru-status';
+import type { KkiruMeetingStatus } from '@/lib/kkiru-status';
 import { type ListQuery, withListParams } from '@/lib/list-query';
 
 export type KkiruCustomerSummary = {
@@ -9,17 +9,18 @@ export type KkiruCustomerSummary = {
   name: string;
   /** 연락처 (숫자만) */
   phone: string;
-  consultationCount: number;
+  meetingCount: number;
   createdAt: string;
 };
 
-export type KkiruCustomerDetail = Omit<KkiruCustomerSummary, 'consultationCount'> & {
+export type KkiruCustomerDetail = Omit<KkiruCustomerSummary, 'meetingCount'> & {
   memo: string | null;
-  consultations: {
+  /** 이 고객의 미팅 (미팅 일시 최근 순) */
+  meetings: {
     code: string;
     title: string;
-    status: KkiruConsultationStatus;
-    consultedOn: string;
+    status: KkiruMeetingStatus;
+    meetAt: string;
   }[];
   updatedAt: string;
 };

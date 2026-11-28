@@ -82,7 +82,7 @@ export class ListListingsQueryDto extends ListQueryDto {
   sort?: ListingSortField;
 }
 
-/** 매물 고르기(상담매물·미팅 대상)용 검색 */
+/** 매물 고르기(미팅 매물·계약 대상)용 검색 */
 export class ListingOptionsQueryDto {
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))

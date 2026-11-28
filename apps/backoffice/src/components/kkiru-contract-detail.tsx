@@ -29,20 +29,14 @@ function ContractHistory({ contract }: { contract: ContractDetail }) {
       aria-label="계약 히스토리"
       className="flex flex-col gap-3 bg-[var(--background)] px-5 py-4"
     >
-      <SectionTitle>계약 히스토리 (상담·미팅 기록)</SectionTitle>
+      <SectionTitle>계약 히스토리 (미팅 기록)</SectionTitle>
       <ol className="flex flex-col divide-y divide-[var(--line)]">
         {contract.history.map((entry) => {
           const kindLabel = MEETING_RECORD_KIND_LABELS[entry.kind];
 
           return (
-            <li
-              className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0"
-              key={`${entry.source}-${entry.id}`}
-            >
+            <li className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0" key={entry.id}>
               <span className="flex flex-wrap items-center gap-2 text-[11px]">
-                <span className="bg-[var(--surface)] px-1.5 py-0.5 font-medium text-[var(--muted)]">
-                  {entry.source === 'consultation' ? '상담' : '미팅'}
-                </span>
                 {kindLabel ? (
                   <span className="font-medium text-[var(--warning)]">{kindLabel}</span>
                 ) : null}
@@ -114,7 +108,7 @@ function ContractActions({
             : '계약 완료로 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
         }
         isOpen={dialog === 'complete'}
-        message="계약을 완료로 바꾸면 미팅·상담도 계약완료가 되고, 매물은 계약완료로 바뀝니다. 되돌릴 수 없습니다."
+        message="계약을 완료로 바꾸면 미팅과 매물이 계약완료로 바뀝니다. 되돌릴 수 없습니다."
         onClose={() => setDialog(null)}
         onConfirm={async () => {
           onChange(await completeContract(contract.id));
@@ -145,10 +139,7 @@ function ContractBody({
           status={contract.status}
           statusLabel={CONTRACT_STATUS_LABELS[contract.status]}
         >
-          <Link className={LINK_CHIP_CLASS_NAME} href={`/kkiru/consultations/${contract.caseCode}`}>
-            상담 기록
-          </Link>
-          <Link className={LINK_CHIP_CLASS_NAME} href={`/kkiru/meetings/${contract.meetingId}`}>
+          <Link className={LINK_CHIP_CLASS_NAME} href={`/kkiru/meetings/${contract.caseCode}`}>
             미팅 기록
           </Link>
         </CodeHeader>
@@ -203,6 +194,8 @@ function ContractBody({
             {formatInquiryDate(contract.leaseStartOn)} ~ {formatInquiryDate(contract.leaseEndOn)}
           </InfoItem>
           <InfoItem label="계약금">{formatManwon(contract.downPayment)}</InfoItem>
+          <InfoItem label="잔금">{formatManwon(contract.balance)}</InfoItem>
+          <InfoItem label="잔금일">{formatInquiryDate(contract.balanceDueOn)}</InfoItem>
           <InfoItem label="수수료">
             <span className="font-semibold">{formatManwon(contract.commission)}</span>
           </InfoItem>

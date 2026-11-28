@@ -12,7 +12,7 @@ export type PickedCustomer = { code: string; name: string; phone: string };
 type KkiruCustomerPickerProps = {
   value: PickedCustomer | null;
   onChange: (value: PickedCustomer | null) => void;
-  /** 주소로 넘어온 고객 번호 (고객 상세의 새 상담) */
+  /** 주소로 넘어온 고객 번호 (고객 상세의 새 미팅) */
   initialCode?: string | null;
 };
 
@@ -33,7 +33,7 @@ function ValueBox({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-// 상담의 고객. '고객 찾기'로 등록된 고객을 고르거나 '고객 추가'로 새로 등록해 고른다.
+// 미팅의 고객. '고객 찾기'로 등록된 고객을 고르거나 '고객 추가'로 새로 등록해 고른다.
 export function KkiruCustomerPicker({ value, onChange, initialCode }: KkiruCustomerPickerProps) {
   const [openDialog, setOpenDialog] = useState<'search' | 'add' | null>(null);
   const [message, setMessage] = useState('');

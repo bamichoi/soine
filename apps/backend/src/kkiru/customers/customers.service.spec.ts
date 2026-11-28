@@ -5,9 +5,9 @@ import { buildCustomerWhere, KkiruCustomersService } from './customers.service';
 
 const CUSTOMER = {
   code: 'C7K3FQ9A',
-  consultations: [],
   createdAt: new Date('2026-11-25T01:00:00.000Z'),
   id: 'customer-1',
+  meetings: [],
   name: '김임차',
   phone: '01012345678',
   updatedAt: new Date('2026-11-25T01:00:00.000Z'),
@@ -25,9 +25,14 @@ function createService() {
   const customer = {
     create: jest.fn((): Promise<unknown> => Promise.resolve(CUSTOMER)),
     findUnique: jest.fn((): Promise<unknown> => Promise.resolve(CUSTOMER)),
+    count: jest.fn(() => 'count'),
+    findMany: jest.fn(() => 'findMany'),
     updateMany: jest.fn((): Promise<unknown> => Promise.resolve({ count: 1 })),
   };
-  const prisma = { kkiruCustomer: customer } as unknown as PrismaService;
+  const prisma = {
+    $transaction: jest.fn(() => Promise.resolve([1, [{ ...CUSTOMER, _count: { meetings: 2 } }]])),
+    kkiruCustomer: customer,
+  } as unknown as PrismaService;
 
   return { customer, service: new KkiruCustomersService(prisma) };
 }
@@ -54,6 +59,20 @@ describe('buildCustomerWhere', () => {
 });
 
 describe('KkiruCustomersService', () => {
+  it('lists customers with their meeting count and sorts by it', async () => {
+    const { customer, service } = createService();
+
+    const result = await service.list({ order: 'asc', sort: 'meetingCount' });
+
+    expect(customer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { _count: { select: { meetings: true } } },
+        orderBy: [{ meetings: { _count: 'asc' } }, { createdAt: 'desc' }, { id: 'asc' }],
+      }),
+    );
+    expect(result.items[0]).toEqual(expect.objectContaining({ code: 'C7K3FQ9A', meetingCount: 2 }));
+  });
+
   it('creates a customer with a random code', async () => {
     const { customer, service } = createService();
 
