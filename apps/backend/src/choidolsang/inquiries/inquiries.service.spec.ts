@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/page-size';
 import { Prisma } from '../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 import {
   buildInquiryOrderBy,
   buildInquiryWhere,
   ChoidolsangInquiriesService,
-  INQUIRY_PAGE_SIZE,
 } from './inquiries.service';
 
 const RECORD_ORDER = [{ recordedOn: 'asc' }, { createdAt: 'asc' }];
@@ -151,13 +151,13 @@ describe('ChoidolsangInquiriesService', () => {
     expect(mock.inquiry.findMany).toHaveBeenCalledWith({
       include: { desiredConcept: true, records: { orderBy: RECORD_ORDER, take: 1 } },
       orderBy: [{ inquiredOn: 'desc' }, { createdAt: 'desc' }],
-      skip: INQUIRY_PAGE_SIZE,
-      take: INQUIRY_PAGE_SIZE,
+      skip: DEFAULT_PAGE_SIZE,
+      take: DEFAULT_PAGE_SIZE,
       where: { deletedAt: null },
     });
     expect(result.pagination).toEqual({
       page: 2,
-      pageSize: INQUIRY_PAGE_SIZE,
+      pageSize: DEFAULT_PAGE_SIZE,
       total: 45,
       totalPages: 3,
     });

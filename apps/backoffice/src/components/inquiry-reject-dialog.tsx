@@ -7,6 +7,12 @@ import {
   REJECTION_REASON_MAX_LENGTH,
   rejectInquiry,
 } from '@/lib/choidolsang-inquiries-api';
+import {
+  DANGER_PRIMARY_BUTTON_CLASS_NAME,
+  ERROR_BOX_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 type InquiryRejectDialogProps = {
   code: string;
@@ -72,7 +78,7 @@ export function InquiryRejectDialog({
   return (
     <dialog
       aria-labelledby={titleId}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] border border-[var(--line)] bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-(--shadow-pop) backdrop:bg-[var(--backdrop)]"
       onCancel={(event) => {
         // Esc: 저장 중에는 닫지 않는다.
         if (isSubmitting) {
@@ -83,18 +89,18 @@ export function InquiryRejectDialog({
       ref={dialogRef}
     >
       <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
-        <h2 className="text-lg font-semibold" id={titleId}>
+        <h2 className="text-lg font-extrabold" id={titleId}>
           문의 거절
         </h2>
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium" htmlFor={reasonId}>
+          <label className="text-sm font-semibold" htmlFor={reasonId}>
             거절 사유
             <span aria-hidden="true" className="ml-0.5 text-[var(--error)]">
               *
             </span>
           </label>
           <textarea
-            className="min-h-32 w-full resize-y border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-[var(--brand)] disabled:opacity-60"
+            className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-32`}
             disabled={isSubmitting}
             id={reasonId}
             maxLength={REJECTION_REASON_MAX_LENGTH}
@@ -108,13 +114,13 @@ export function InquiryRejectDialog({
           </p>
         </div>
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
           <button
-            className="h-10 border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)] disabled:opacity-60"
+            className={SECONDARY_BUTTON_CLASS_NAME}
             disabled={isSubmitting}
             onClick={onClose}
             type="button"
@@ -122,7 +128,7 @@ export function InquiryRejectDialog({
             취소
           </button>
           <button
-            className="h-10 bg-[var(--error)] px-5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className={DANGER_PRIMARY_BUTTON_CLASS_NAME}
             disabled={isSubmitting}
             type="submit"
           >

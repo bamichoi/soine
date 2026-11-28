@@ -101,7 +101,7 @@ export function AdminLoginForm({ initialService }: AdminLoginFormProps) {
               aria-selected={isSelected}
               className={`h-9 rounded-md text-sm font-medium transition disabled:opacity-60 ${
                 isSelected
-                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm'
+                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-(--shadow-xs)'
                   : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
               disabled={isSubmitting}
@@ -183,7 +183,7 @@ export function AdminLoginForm({ initialService }: AdminLoginFormProps) {
         ) : null}
 
         <button
-          className="mt-1 h-11 rounded-md bg-[var(--brand)] font-semibold text-white transition hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-1 h-11 rounded-md bg-[var(--brand)] font-semibold text-[var(--on-accent)] transition hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isSubmitting}
           type="submit"
         >

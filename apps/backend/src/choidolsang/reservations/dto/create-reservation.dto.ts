@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { PAGE_SIZES, type PageSize } from '../../../common/page-size';
 import { cleanStringList } from '../../concepts/dto/concept.dto';
 import { DateOnlyField } from '../../inquiries/dto/create-inquiry.dto';
 
@@ -170,6 +171,12 @@ export class ListReservationsQueryDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  /** 한 페이지 개수. 10·20·50·100 중 하나, 없으면 20 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn(PAGE_SIZES)
+  size?: PageSize;
 
   @IsOptional()
   @IsIn(RESERVATION_SEARCH_FIELDS)

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icon';
+import { FOCUS_CLASS_NAME } from '@/lib/ui';
 
 type CopyCodeButtonProps = {
   code: string;
@@ -45,7 +46,7 @@ export function CopyCodeButton({ code, label }: CopyCodeButtonProps) {
   return (
     <button
       aria-label={state === 'copied' ? `${label} 복사됨` : `${label} ${code} 복사`}
-      className={`relative z-10 inline-flex size-6 shrink-0 items-center justify-center hover:bg-[var(--background)] ${
+      className={`relative z-10 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition hover:bg-[var(--background)] ${FOCUS_CLASS_NAME} ${
         state === 'copied'
           ? 'text-[var(--success)]'
           : 'text-[var(--muted)] hover:text-[var(--foreground)]'

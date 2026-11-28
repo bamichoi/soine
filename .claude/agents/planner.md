@@ -15,7 +15,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
      `gh issue create`로 직접 만든다. 만든 뒤 Issue 번호와 링크를 돌려준다.
 2. **화면·흐름 설계**
    - 메뉴, 화면 구성, 버튼 문구, 상태 이름, 사용자 흐름을 정한다.
-   - 기존 화면과 용어를 먼저 읽고 맞춘다 (예: `apps/backoffice/src/lib/kkiru-status.ts`, `admin-menu.ts`).
+   - 기존 화면과 용어를 먼저 읽고 맞춘다 (예: `apps/backoffice/src/lib/goodplace-status.ts`, `admin-menu.ts`).
    - UI 제목 위에 영어 번역 부제를 넣지 않는다. 문구는 한국어로 쓴다.
 3. **ADR 초안**
    - 아키텍처·운영 정책·API 계약·DB 스키마가 바뀌면 `docs/adr/ADR-XXXX-제목.md`로 초안을 쓴다.
@@ -27,7 +27,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
   설정 파일은 읽기만 한다.
 - Bash는 코드·이력 조회(`git log`, `git diff`, `gh issue view` 등)와 Issue 생성에만 쓴다.
   커밋, 푸시, 브랜치 변경, 서버 실행, DB 변경을 하지 않는다.
-- 초이돌상과 끼루는 스키마·계정·세션이 분리된 별개 서비스다. 기획이 둘을 섞지 않게 한다.
+- 초이돌상과 굿플레이스는 스키마·계정·세션이 분리된 별개 서비스다. 기획이 둘을 섞지 않게 한다.
 - 보안·인증·결제·데이터 삭제가 걸린 기획은 "사람이 확정해야 함"으로 표시한다.
 
 ## 돌려줄 형식

@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { PAGE_SIZES, type PageSize } from '../../../common/page-size';
 
 /** 검색 대상 항목. all은 검색 가능한 모든 항목에서 찾는다. */
 export const INQUIRY_SEARCH_FIELDS = [
@@ -34,6 +35,12 @@ export class ListInquiriesQueryDto {
   @Min(1)
   @Max(100_000)
   page?: number;
+
+  /** 한 페이지 개수. 10·20·50·100 중 하나, 없으면 20 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn(PAGE_SIZES)
+  size?: PageSize;
 
   @IsOptional()
   @IsIn(INQUIRY_SEARCH_FIELDS)

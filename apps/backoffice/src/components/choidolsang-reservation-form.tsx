@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { ConceptSelect } from '@/components/concept-select';
+import { DataLoader } from '@/components/data-loader';
 import { FormField } from '@/components/form-field';
 import { Icon } from '@/components/icon';
+import { Notice } from '@/components/page-parts';
 import { StringListInput } from '@/components/string-list-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import type { ConceptOption } from '@/lib/choidolsang-concepts-api';
@@ -34,12 +36,21 @@ import {
 import { formatWon, parseAmountText, toAmountText } from '@/lib/money';
 import { formatPhone, isValidMobilePhone } from '@/lib/phone';
 import { type StringListItem, toStringListItems, toStringListValues } from '@/lib/string-list';
+import {
+  chipClassName,
+  ERROR_BOX_CLASS_NAME,
+  FOCUS_CLASS_NAME,
+  FORM_SECTION_TITLE_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  INPUT_UNIT_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 const INQUIRIES_PATH = '/choidolsang/inquiries';
 const RESERVATIONS_PATH = '/choidolsang/reservations';
-
-const CONTROL_CLASS_NAME =
-  'w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
 type FormValues = {
   customerName: string;
@@ -202,7 +213,7 @@ function getSubmitErrorMessage(error: unknown, isEdit: boolean): string {
 }
 
 function SectionTitle({ children }: { children: string }) {
-  return <h3 className="text-xs font-medium text-[var(--muted)]">{children}</h3>;
+  return <h3 className={FORM_SECTION_TITLE_CLASS_NAME}>{children}</h3>;
 }
 
 /** 문의에서 새 예약을 만들거나, 예약중인 예약을 고친다. */
@@ -270,19 +281,24 @@ function ReservationForm({ target }: { target: FormTarget }) {
   return (
     <form
       aria-label={isEdit ? '예약 수정' : '예약 확정'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <Link
-        className="mb-6 flex items-center justify-between gap-3 bg-[var(--background)] px-4 py-3 text-sm hover:bg-[var(--brand-soft)]"
+        className={`group mb-8 flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-[var(--background)] px-4 py-3 text-sm transition hover:bg-[var(--brand-soft)] ${FOCUS_CLASS_NAME}`}
         href={inquiryHref}
       >
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-[var(--muted)]">문의</span>
-          <span className="shrink-0 font-mono tracking-wide">{inquiryCode}</span>
-          {inquirySummary ? <span className="truncate">{inquirySummary}</span> : null}
+          <span className="shrink-0 font-semibold text-[var(--muted)]">문의</span>
+          <span className="shrink-0 font-mono text-[13px]" translate="no">
+            {inquiryCode}
+          </span>
+          {inquirySummary ? <span className="truncate font-semibold">{inquirySummary}</span> : null}
         </span>
-        <Icon className="size-4 shrink-0 text-[var(--muted)]" name="chevron-right" />
+        <Icon
+          className="size-4 shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5"
+          name="chevron-right"
+        />
       </Link>
 
       <fieldset className="flex flex-col gap-8" disabled={isSubmitting}>
@@ -292,7 +308,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           <SectionTitle>행사</SectionTitle>
           <FormField htmlFor={id('customer-name')} label="예약자 성함" required>
             <input
-              className={`${CONTROL_CLASS_NAME} h-10 sm:w-64`}
+              className={`${INPUT_CLASS_NAME} sm:w-64`}
               id={id('customer-name')}
               maxLength={100}
               onChange={(event) => update('customerName', event.target.value)}
@@ -303,7 +319,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           <FormField htmlFor={id('customer-phone')} label="예약자 연락처" required>
             <input
               autoComplete="off"
-              className={`${CONTROL_CLASS_NAME} h-10 tabular-nums sm:w-64`}
+              className={`${INPUT_CLASS_NAME} tabular-nums sm:w-64`}
               id={id('customer-phone')}
               inputMode="tel"
               onChange={(event) => update('customerPhone', formatPhone(event.target.value))}
@@ -322,7 +338,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
             <div className="flex flex-wrap gap-2">
               <input
                 aria-label="행사 날짜"
-                className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
+                className={`${INPUT_CLASS_NAME} sm:w-48`}
                 id={id('event-date')}
                 onChange={(event) => update('eventDate', event.target.value)}
                 required
@@ -331,7 +347,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
               />
               <input
                 aria-label="행사 시간"
-                className={`${CONTROL_CLASS_NAME} h-10 sm:w-36`}
+                className={`${INPUT_CLASS_NAME} sm:w-36`}
                 onChange={(event) => update('eventTime', event.target.value)}
                 required
                 step={600}
@@ -342,7 +358,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           </FormField>
           <FormField htmlFor={id('event-location')} label="행사 장소" required>
             <input
-              className={`${CONTROL_CLASS_NAME} h-10`}
+              className={INPUT_CLASS_NAME}
               id={id('event-location')}
               maxLength={200}
               onChange={(event) => update('eventLocation', event.target.value)}
@@ -353,7 +369,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           <FormField htmlFor={id('guest-count')} label="참석 인원" required>
             <div className="relative sm:w-40">
               <input
-                className={`${CONTROL_CLASS_NAME} h-10 pr-9 text-right tabular-nums`}
+                className={`${INPUT_CLASS_NAME} pr-10 text-right tabular-nums`}
                 id={id('guest-count')}
                 inputMode="numeric"
                 onChange={(event) =>
@@ -362,9 +378,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
                 required
                 value={values.guestCountText}
               />
-              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-                명
-              </span>
+              <span className={INPUT_UNIT_CLASS_NAME}>명</span>
             </div>
           </FormField>
         </section>
@@ -373,7 +387,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           <SectionTitle>아기</SectionTitle>
           <FormField htmlFor={id('baby-name')} label="아기 이름" required>
             <input
-              className={`${CONTROL_CLASS_NAME} h-10 sm:w-64`}
+              className={`${INPUT_CLASS_NAME} sm:w-64`}
               id={id('baby-name')}
               maxLength={100}
               onChange={(event) => update('babyName', event.target.value)}
@@ -441,7 +455,7 @@ function ReservationForm({ target }: { target: FormTarget }) {
           </FormField>
           <FormField htmlFor={id('requests')} label="추가 요청 사항">
             <textarea
-              className={`${CONTROL_CLASS_NAME} min-h-28 resize-y py-2.5 leading-relaxed`}
+              className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28`}
               id={id('requests')}
               maxLength={RESERVATION_REQUESTS_MAX_LENGTH}
               onChange={(event) => update('requests', event.target.value)}
@@ -472,13 +486,13 @@ function ReservationForm({ target }: { target: FormTarget }) {
             />
           </FormField>
           <FormField label="잔금">
-            <p className="flex h-10 items-center text-sm tabular-nums sm:w-56 sm:justify-end">
+            <p className="flex h-11 items-center px-3.5 text-[15px] font-bold tabular-nums sm:w-56 sm:justify-end">
               {totalAmount === null ? '-' : formatWon(totalAmount - depositAmount)}
             </p>
           </FormField>
           <FormField htmlFor={id('confirmed-on')} label="예약 확정 날짜" required>
             <input
-              className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('confirmed-on')}
               onChange={(event) => update('confirmedOn', event.target.value)}
               required
@@ -491,22 +505,15 @@ function ReservationForm({ target }: { target: FormTarget }) {
 
       <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
-          >
+          <Link className={SECONDARY_BUTTON_CLASS_NAME} href={cancelHref}>
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : isEdit ? '저장' : '예약 확정'}
           </button>
         </div>
@@ -522,7 +529,7 @@ type ChoiceButtonsProps<T extends string | boolean> = {
   onChange: (value: T) => void;
 };
 
-// 둘 이상 중 하나를 반드시 고르는 버튼 묶음. 선택은 풀 수 없다.
+// 둘 이상 중 하나를 반드시 고르는 칩 묶음 (흰 카드 안). 선택은 풀 수 없다.
 function ChoiceButtons<T extends string | boolean>({
   label,
   options,
@@ -530,7 +537,7 @@ function ChoiceButtons<T extends string | boolean>({
   onChange,
 }: ChoiceButtonsProps<T>) {
   return (
-    <fieldset className="flex gap-2">
+    <fieldset className="flex flex-wrap gap-2">
       <legend className="sr-only">{label}</legend>
       {options.map((option) => {
         const isSelected = option.value === value;
@@ -538,11 +545,7 @@ function ChoiceButtons<T extends string | boolean>({
         return (
           <button
             aria-pressed={isSelected}
-            className={`flex h-10 items-center border px-4 text-sm ${
-              isSelected
-                ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
-                : 'border-[var(--line)] hover:bg-[var(--background)]'
-            }`}
+            className={chipClassName(isSelected, 'card')}
             key={String(option.value)}
             onClick={() => onChange(option.value)}
             type="button"
@@ -567,7 +570,7 @@ function AmountInput({
   return (
     <div className="relative sm:w-56">
       <input
-        className={`${CONTROL_CLASS_NAME} h-10 pr-9 text-right tabular-nums`}
+        className={`${INPUT_CLASS_NAME} pr-10 text-right tabular-nums`}
         id={id}
         inputMode="numeric"
         onChange={(event) => onChange(toAmountText(event.target.value))}
@@ -575,147 +578,62 @@ function AmountInput({
         required
         value={value}
       />
-      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-        원
-      </span>
+      <span className={INPUT_UNIT_CLASS_NAME}>원</span>
     </div>
   );
 }
 
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; inquiry: InquiryDetail };
+/** 이미 예약이 있거나 고칠 수 없을 때 안내 카드 + 예약 보기 링크 */
+function ReservationNotice({ text, reservationCode }: { text: string; reservationCode: string }) {
+  return (
+    <Notice
+      text={
+        <>
+          {text}{' '}
+          <Link
+            className={`rounded-sm font-semibold text-[var(--brand)] underline underline-offset-2 hover:text-[var(--brand-hover)] ${FOCUS_CLASS_NAME}`}
+            href={`${RESERVATIONS_PATH}/${reservationCode}`}
+          >
+            예약 보기
+          </Link>
+        </>
+      }
+    />
+  );
+}
 
 /** 문의를 불러와 예약 폼을 연다. 이미 예약된 문의면 그 예약으로 안내한다. */
 export function ChoidolsangReservationCreate({ inquiryCode }: { inquiryCode: string }) {
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-
-    getInquiry(inquiryCode)
-      .then((inquiry) => {
-        if (isActive) {
-          setState({ inquiry, kind: 'loaded' });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [inquiryCode]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">문의를 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 문의를 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        문의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  const { inquiry } = state;
-
-  if (inquiry.reservationCode) {
-    return (
-      <p className="py-10 text-sm">
-        이미 예약이 만들어진 문의입니다.{' '}
-        <Link
-          className="text-[var(--brand)] underline underline-offset-2"
-          href={`${RESERVATIONS_PATH}/${inquiry.reservationCode}`}
-        >
-          예약 보기
-        </Link>
-      </p>
-    );
-  }
-
-  return <ReservationForm target={{ inquiry, kind: 'create' }} />;
+  return (
+    <DataLoader load={getInquiry} loadKey={inquiryCode} noun="문의">
+      {(inquiry) =>
+        inquiry.reservationCode ? (
+          <ReservationNotice
+            reservationCode={inquiry.reservationCode}
+            text="이미 예약이 만들어진 문의입니다."
+          />
+        ) : (
+          <ReservationForm target={{ inquiry, kind: 'create' }} />
+        )
+      }
+    </DataLoader>
+  );
 }
-
-type EditLoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; reservation: Reservation };
 
 /** 예약을 불러와 수정 폼을 연다. 예약중이 아니면 수정할 수 없다고 안내한다. */
 export function ChoidolsangReservationEdit({ code }: { code: string }) {
-  const [state, setState] = useState<EditLoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-
-    getReservation(code)
-      .then((reservation) => {
-        if (isActive) {
-          setState({ kind: 'loaded', reservation });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">예약을 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 예약을 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        예약을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  const { reservation } = state;
-
-  if (reservation.status !== 'reserved') {
-    return (
-      <p className="py-10 text-sm">
-        완료되었거나 취소된 예약은 수정할 수 없습니다.{' '}
-        <Link
-          className="text-[var(--brand)] underline underline-offset-2"
-          href={`${RESERVATIONS_PATH}/${reservation.code}`}
-        >
-          예약 보기
-        </Link>
-      </p>
-    );
-  }
-
-  return <ReservationForm target={{ kind: 'edit', reservation }} />;
+  return (
+    <DataLoader load={getReservation} loadKey={code} noun="예약">
+      {(reservation) =>
+        reservation.status === 'reserved' ? (
+          <ReservationForm target={{ kind: 'edit', reservation }} />
+        ) : (
+          <ReservationNotice
+            reservationCode={reservation.code}
+            text="완료되었거나 취소된 예약은 수정할 수 없습니다."
+          />
+        )
+      }
+    </DataLoader>
+  );
 }

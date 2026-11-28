@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Icon } from '@/components/icon';
+import { FOCUS_CLASS_NAME } from '@/lib/ui';
 
 type BackToListLinkProps = {
   href: string;
@@ -18,7 +19,7 @@ export function BackToListLink({ href, keepQuery = true }: BackToListLinkProps) 
 
   return (
     <Link
-      className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)] md:hidden"
+      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--foreground)] md:hidden ${FOCUS_CLASS_NAME}`}
       href={query ? `${href}?${query}` : href}
     >
       <Icon className="size-4" name="arrow-left" />

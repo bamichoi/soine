@@ -15,7 +15,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 ## 구현 규칙
 
-- 초이돌상(`choidolsang`)과 끼루(`kkiru`) 테이블은 각자 스키마에 두고 서로 외래키를 맺지 않는다.
+- 초이돌상(`choidolsang`)과 굿플레이스(`goodplace`) 테이블은 각자 스키마에 두고 서로 외래키를 맺지 않는다.
 - 백오피스 권한은 백엔드에서 강제한다. 프론트 경로 가드만으로 막지 않는다.
 - 클릭되는 요소에는 `cursor-pointer`를 준다. UI 제목 위에 영어 부제를 넣지 않는다.
 - DB 스키마를 바꾸면 Prisma 마이그레이션을 만든다. enum 값 추가와 그 값을 쓰는 데이터 변경은

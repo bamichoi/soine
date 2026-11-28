@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>굿플레이스 스타일 통일 시안 - 일정</title>
+<style>
+  /* apps/backoffice/src/app/globals.css 토큰과 같은 값 */
+  :root {
+    --background: #f4f6f9; --surface: #ffffff; --foreground: #1d2433; --muted: #667085; --line: #d9dee6;
+    --brand: #094ea3; --brand-hover: #0b5cc0; --brand-strong: #073b7b; --brand-soft: #e6eef8;
+    --error: #b42318; --error-soft: #fef3f2; --success: #067647; --success-soft: #ecfdf3;
+    --warning: #b54708; --warning-soft: #fffaeb;
+    --faint: rgb(102 112 133 / 0.7);          /* text-[var(--muted)]/70 */
+    --line-60: rgb(217 222 230 / 0.6);        /* border-[var(--line)]/60 */
+    --line-40: rgb(217 222 230 / 0.4);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9ecf0; color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, p { margin: 0; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
+  a { color: inherit; text-decoration: none; }
+  a, button, select, [role="button"] { cursor: pointer; }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.i.s16 { width: 16px; height: 16px; } svg.i.s14 { width: 14px; height: 14px; }
+
+  /* ---------- 앱 틀: admin-shell.tsx 지금 모양 그대로 ---------- */
+  .shell { width: 1280px; min-height: 900px; margin: 0 auto; background: var(--background); }
+  .top { position: sticky; top: 0; height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .crumb { display: flex; align-items: center; gap: 6px; }
+  .crumb a { font-size: 18px; font-weight: 600; color: var(--brand); }
+  .crumb svg { color: var(--muted); }
+  .crumb span { font-size: 14px; font-weight: 500; }
+  .top-right { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .top-right button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; color: var(--muted); }
+  .top-right button:hover { background: var(--background); color: var(--foreground); }
+  .frame { display: flex; }
+  .side { width: 240px; flex: none; min-height: 844px; background: var(--surface); border-right: 1px solid var(--line); padding: 12px; }
+  .side ul { display: flex; flex-direction: column; gap: 4px; }
+  .side a { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .side a:hover { background: var(--background); color: var(--foreground); }
+  .side a[aria-current="page"] { background: var(--brand-soft); color: var(--brand); }
+  main { flex: 1; min-width: 0; padding: 32px; }
+
+  /* ---------- 굿플레이스 공통 (goodplace-style-guide.md) ---------- */
+  .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 8px 0 20px; }
+  .head h2 { font-size: 26px; line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
+  .head h2 em { font-style: normal; margin-left: 8px; font-size: 17px; font-weight: 700; color: var(--brand); }
+  .chip { padding: 8px 14px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .chip:hover { color: var(--foreground); }
+  .chip[aria-pressed="true"] { background: var(--foreground); color: var(--surface); }
+  .badge { display: inline-flex; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .t-active { background: var(--brand-soft); color: var(--brand); }
+  .t-done { background: var(--success-soft); color: var(--success); }
+  .t-negative { background: var(--error-soft); color: var(--error); }
+  .icon-btn { display: grid; place-items: center; width: 24px; height: 24px; color: var(--muted); position: relative; z-index: 1; }
+  .icon-btn:hover { background: var(--background); color: var(--foreground); }
+
+  /* ---------- 일정 ---------- */
+  .controls { display: flex; align-items: center; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; height: 42px; padding: 0 16px; border-radius: 12px; background: var(--surface); font-size: 14px; font-weight: 600; }
+  .btn:hover { background: rgb(255 255 255 / .7); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .period { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface); }
+  .period button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--muted); }
+  .period button:hover { background: var(--background); }
+  .period strong { min-width: 116px; text-align: center; font-size: 15px; font-weight: 700; }
+
+  .cal { background: var(--surface); border-radius: 20px; padding: 20px 24px 16px; }
+  .cal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .d-m { background: var(--brand); } .d-c { background: var(--success); } .d-b { background: var(--warning); }
+  .hint { font-size: 12px; color: var(--faint); }
+  .cal table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 4px; margin: 0 -4px; width: calc(100% + 8px); }
+  .cal th { padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; }
+  .cal th.sun { color: var(--error); } .cal th.sat { color: var(--brand); }
+  .cal td { padding: 0; vertical-align: top; }
+  .cell { display: flex; flex-direction: column; gap: 4px; width: 100%; height: 104px; padding: 8px; border-radius: 12px; text-align: left; }
+  .cell:hover { background: var(--background); }
+  .cell[aria-pressed="true"] { background: var(--brand-soft); }
+  .cell.other .n, .cell.other .evs { opacity: .4; }
+  .n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .n.sun { color: var(--error); } .n.sat { color: var(--brand); }
+  .n.today { background: var(--brand); color: #fff; font-weight: 800; }
+  .evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%; }
+  .ev { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 6px; padding: 2px 6px; font-size: 11px; line-height: 16px; font-weight: 600; }
+  .ev-m { background: var(--brand-soft); color: var(--brand); }
+  .ev-c { background: var(--success-soft); color: var(--success); }
+  .ev-b { background: var(--warning-soft); color: var(--warning); }
+  .cell[aria-pressed="true"] .ev-m { background: var(--surface); }
+  .more { padding: 0 6px; font-size: 11px; font-weight: 600; color: var(--faint); }
+
+  .group-head { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 12px; }
+  .group-head h3 { font-size: 19px; font-weight: 800; }
+  .group-head h3 em { font-style: normal; color: var(--brand); margin-left: 6px; }
+  .rows { display: grid; gap: 8px; }
+  .row { display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 18px; align-items: center; background: var(--surface); border-radius: 18px; padding: 16px 22px; transition: transform .15s, box-shadow .15s; }
+  .row:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(16,24,40,.06); }
+  .tb { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 16px; line-height: 1.15; }
+  .tb b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .tb span { font-size: 11px; font-weight: 700; }
+  .tb-m { background: var(--brand-soft); color: var(--brand-strong); }
+  .tb-c { background: var(--success-soft); color: var(--success); }
+  .tb-b { background: var(--warning-soft); color: var(--warning); }
+  .row .t { font-size: 16px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .row .s { margin-top: 2px; font-size: 14px; color: var(--muted); }
+  .row .s .mono { font-size: 12px; color: var(--faint); }
+  .row .r { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .row .r b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .note { margin-top: 32px; padding: 14px 18px; border-radius: 14px; background: var(--surface); color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .note b { color: var(--foreground); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/></symbol>
+  <symbol id="handshake" viewBox="0 0 24 24"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7 .9l.2.2a2 2 0 0 0 1.4.6H21"/><path d="m21 3 1 11h-2M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></symbol>
+  <symbol id="file-text" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="megaphone" viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1Z"/><path d="M17 9a4 4 0 0 1 0 6M7 15l1.5 5h2.5l-1-5"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="chevron-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="chevrons-up-down" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></symbol>
+  <symbol id="arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></symbol>
+  <symbol id="logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+  <symbol id="arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+</svg>
+<div class="shell">
+  <header class="top">
+    <nav aria-label="현재 위치"><ol class="crumb"><li><a href="#">굿플레이스</a></li><li style="display:flex;align-items:center;gap:6px"><svg class="i s16"><use href="#chevron-right"/></svg><span aria-current="page">일정</span></li></ol></nav>
+    <div class="top-right"><span>굿플레이스 관리자</span><button type="button"><svg class="i s16"><use href="#logout"/></svg>로그아웃</button></div>
+  </header>
+  <div class="frame">
+    <aside class="side">
+      <nav aria-label="메인 메뉴"><ul>
+        <li><a href="goodplace-style-schedule.html" aria-current="page"><svg class="i"><use href="#calendar"/></svg>일정</a></li>
+        <li><a href="#"><svg class="i"><use href="#home"/></svg>매물</a></li>
+        <li><a href="goodplace-style-meeting-detail.html"><svg class="i"><use href="#handshake"/></svg>미팅</a></li>
+        <li><a href="goodplace-style-contracts.html"><svg class="i"><use href="#file-text"/></svg>계약</a></li>
+        <li><a href="#"><svg class="i"><use href="#users"/></svg>고객</a></li>
+        <li><a href="#"><svg class="i"><use href="#megaphone"/></svg>광고</a></li>
+        <li><a href="#"><svg class="i"><use href="#wallet"/></svg>수입</a></li>
+      </ul></nav>
+    </aside>
+    <main>
+      <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">일정</h1>
+      <!-- 제목 줄: 수입과 같은 기간 이동. 이번 달이면 '오늘' 비활성. ?month=2026-11 그대로 -->
+      <div class="head">
+        <h2>일정</h2>
+        <div class="controls">
+          <button class="btn" type="button" disabled>오늘</button>
+          <div class="period">
+            <button type="button" aria-label="이전 달"><svg class="i"><use href="#chevron-left"/></svg></button>
+            <strong class="num" aria-live="polite">2026년 11월</strong>
+            <button type="button" aria-label="다음 달"><svg class="i"><use href="#chevron-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <section class="cal" aria-label="일정 달력">
+        <div class="cal-top">
+          <ul class="legend" aria-label="달력 색 안내">
+            <li><span class="dot d-m" aria-hidden="true"></span>미팅 (미팅 일시)</li>
+            <li><span class="dot d-c" aria-hidden="true"></span>계약 (계약일)</li>
+            <li><span class="dot d-b" aria-hidden="true"></span>잔금 (잔금일)</li>
+          </ul>
+          <p class="hint">진행중단 미팅과 취소된 계약은 표시하지 않음</p>
+        </div>
+        <table>
+          <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">2026년 11월 달력</caption>
+          <thead><tr><th class="sun" scope="col">일</th><th scope="col">월</th><th scope="col">화</th><th scope="col">수</th><th scope="col">목</th><th scope="col">금</th><th class="sat" scope="col">토</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 1일 (일) 일정 1건"><time class="n sun" datetime="2026-11-01">1</time><span aria-hidden="true" class="evs"><span class="ev ev-m"><span class="num">00:00</span> [샘플] 상수동 공방</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 2일 (월) 일정 1건"><time class="n" datetime="2026-11-02">2</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 망원동 카페 자리 3</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 3일 (화) 일정 1건"><time class="n" datetime="2026-11-03">3</time><span aria-hidden="true" class="evs"><span class="ev ev-m"><span class="num">23:00</span> [샘플] 성수동 카페 문의 101</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 4일 (수) 일정 0건"><time class="n" datetime="2026-11-04">4</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 5일 (목) 일정 0건"><time class="n" datetime="2026-11-05">5</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 6일 (금) 일정 2건"><time class="n" datetime="2026-11-06">6</time><span aria-hidden="true" class="evs"><span class="ev ev-b"><span class="num">잔금</span> [샘플] 성수동 편집숍 자리 39</span><span class="ev ev-c"><span class="num">계약</span> [샘플] 연남동 편집숍 자리 145</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 7일 (토) 일정 0건"><time class="n sat" datetime="2026-11-07">7</time><span aria-hidden="true" class="evs"></span></button></td>
+            </tr>
+            <tr>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 8일 (일) 일정 0건"><time class="n sun" datetime="2026-11-08">8</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 9일 (월) 일정 0건"><time class="n" datetime="2026-11-09">9</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 10일 (화) 일정 1건"><time class="n" datetime="2026-11-10">10</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 성수동 카페 자리 101</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 11일 (수) 일정 0건"><time class="n" datetime="2026-11-11">11</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="true" aria-label="11월 12일 (목) 일정 3건"><time class="n" datetime="2026-11-12">12</time><span aria-hidden="true" class="evs"><span class="ev ev-b"><span class="num">잔금</span> [샘플] 서촌 네일숍 자리 156</span><span class="ev ev-c"><span class="num">계약</span> [샘플] 문래동 창고형 매장</span><span class="more">+1건</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 13일 (금) 일정 0건"><time class="n" datetime="2026-11-13">13</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 14일 (토) 일정 2건"><time class="n sat" datetime="2026-11-14">14</time><span aria-hidden="true" class="evs"><span class="ev ev-m"><span class="num">23:00</span> [샘플] 상수동 편집숍 문의 99</span><span class="ev ev-m"><span class="num">23:00</span> [샘플] 서촌 카페 문의 30</span></span></button></td>
+            </tr>
+            <tr>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 15일 (일) 일정 0건"><time class="n sun" datetime="2026-11-15">15</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 16일 (월) 일정 1건"><time class="n" datetime="2026-11-16">16</time><span aria-hidden="true" class="evs"><span class="ev ev-b"><span class="num">잔금</span> [샘플] 연남동 네일숍 자리 24</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 17일 (화) 일정 0건"><time class="n" datetime="2026-11-17">17</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 18일 (수) 일정 2건"><time class="n" datetime="2026-11-18">18</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 송리단길 브런치 자리</span><span class="ev ev-m"><span class="num">14:30</span> [샘플] 송리단길 브런치</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 19일 (목) 일정 0건"><time class="n" datetime="2026-11-19">19</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 20일 (금) 일정 2건"><time class="n" datetime="2026-11-20">20</time><span aria-hidden="true" class="evs"><span class="ev ev-m"><span class="num">00:00</span> [샘플] 연남동 2호점 문의</span><span class="ev ev-m"><span class="num">23:00</span> [샘플] 문래동 네일숍 문의 112</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 21일 (토) 일정 2건"><time class="n sat" datetime="2026-11-21">21</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 상수동 편집숍 자리 99</span><span class="ev ev-c"><span class="num">계약</span> [샘플] 서촌 카페 자리 30</span></span></button></td>
+            </tr>
+            <tr>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 22일 (일) 일정 1건"><time class="n sun" datetime="2026-11-22">22</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 합정역 지하 와인바</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 23일 (월) 일정 0건"><time class="n" datetime="2026-11-23">23</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 24일 (화) 일정 0건"><time class="n" datetime="2026-11-24">24</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 25일 (수) 일정 2건"><time class="n" datetime="2026-11-25">25</time><span aria-hidden="true" class="evs"><span class="ev ev-b"><span class="num">잔금</span> [샘플] 연남동 공방 자리 90</span><span class="ev ev-m"><span class="num">23:00</span> [샘플] 문래동 식당 문의 104</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 26일 (목) 일정 2건"><time class="n" datetime="2026-11-26">26</time><span aria-hidden="true" class="evs"><span class="ev ev-m"><span class="num">23:00</span> [샘플] 익선동 쇼룸 문의 31</span><span class="ev ev-m"><span class="num">23:00</span> [샘플] 을지로 베이커리 문의 66</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 27일 (금) 일정 1건"><time class="n" datetime="2026-11-27">27</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 문래동 네일숍 자리 112</span></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 28일 (토) 일정 0건"><time class="n today sat" datetime="2026-11-28">28</time><span aria-hidden="true" class="evs"></span></button></td>
+            </tr>
+            <tr>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 29일 (일) 일정 0건"><time class="n sun" datetime="2026-11-29">29</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell" type="button" aria-pressed="false" aria-label="11월 30일 (월) 일정 0건"><time class="n" datetime="2026-11-30">30</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell other" type="button" aria-pressed="false" aria-label="12월 1일 (화) 일정 5건"><time class="n" datetime="2026-12-01">1</time><span aria-hidden="true" class="evs"><span class="ev ev-b"><span class="num">잔금</span> [샘플] 송리단길 브런치 자리</span><span class="ev ev-b"><span class="num">잔금</span> [샘플] 성수동 2층 쇼룸</span><span class="more">+3건</span></span></button></td>
+              <td><button class="cell other" type="button" aria-pressed="false" aria-label="12월 2일 (수) 일정 1건"><time class="n" datetime="2026-12-02">2</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 문래동 식당 자리 104</span></span></button></td>
+              <td><button class="cell other" type="button" aria-pressed="false" aria-label="12월 3일 (목) 일정 2건"><time class="n" datetime="2026-12-03">3</time><span aria-hidden="true" class="evs"><span class="ev ev-c"><span class="num">계약</span> [샘플] 익선동 쇼룸 자리 31</span><span class="ev ev-c"><span class="num">계약</span> [샘플] 을지로 베이커리 자리 66</span></span></button></td>
+              <td><button class="cell other" type="button" aria-pressed="false" aria-label="12월 4일 (금) 일정 0건"><time class="n" datetime="2026-12-04">4</time><span aria-hidden="true" class="evs"></span></button></td>
+              <td><button class="cell other" type="button" aria-pressed="false" aria-label="12월 5일 (토) 일정 0건"><time class="n sat" datetime="2026-12-05">5</time><span aria-hidden="true" class="evs"></span></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div class="group-head" aria-live="polite">
+        <h3>11월 12일 (목) 일정<em class="num">3건</em></h3>
+      </div>
+      <ul class="rows">
+        <li><a class="row" href="#">
+          <div class="tb tb-b"><b>종일</b><span>잔금</span></div>
+          <div style="min-width:0"><p class="t">[샘플] 서촌 네일숍 자리 156</p><p class="s">[샘플] 임의고객156 · 케이스 <span class="mono" translate="no">8622A7CA</span></p></div>
+          <div class="r"><b>잔금 6,750만원</b><span class="badge t-done">계약완료</span></div>
+        </a></li>
+        <li><a class="row" href="#">
+          <div class="tb tb-c"><b>종일</b><span>계약</span></div>
+          <div style="min-width:0"><p class="t">[샘플] 문래동 창고형 매장</p><p class="s">[샘플] 조시우 · 케이스 <span class="mono" translate="no">133BBJVT</span></p></div>
+          <div class="r"><span class="badge t-done">계약완료</span></div>
+        </a></li>
+        <li><a class="row" href="#">
+          <div class="tb tb-m"><b>10:30</b><span>미팅</span></div>
+          <div style="min-width:0"><p class="t">[샘플] 문래동 창고형 매장</p><p class="s">[샘플] 조시우 · 케이스 <span class="mono" translate="no">133BBJVT</span></p></div>
+          <div class="r"><span class="badge t-done">계약완료</span></div>
+        </a></li>
+      </ul>
+
+      <div class="note">
+        <b>시안 메모</b> · 날짜 칸을 누르면 아래 목록이 바뀐다(고른 날은 연한 파랑 바탕, 오늘은 숫자에 진한 원).
+        이날 일정이 없으면 목록 자리에 안내 카드 "이날은 일정이 없습니다." 불러오기 실패는 달력 카드 위에 오류 카드 + '다시 시도'.
+        모바일: 칸 높이 64px, 일정은 색 점만, 제목 줄 컨트롤은 다음 줄 전체 폭.
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

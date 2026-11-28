@@ -2,10 +2,9 @@
 
 import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { Icon } from '@/components/icon';
-import { ICON_BUTTON_CLASS_NAME } from '@/lib/kkiru-ui';
+import { ICON_BUTTON_CLASS_NAME } from '@/lib/ui';
 
-// 현재 끼루 전용 (고객 찾기·고객 추가). 끼루 모달 모양(docs/design/kkiru-style-guide.md '모달')이다.
-// 초이돌상에서 쓰게 되면 look prop으로 나눈다.
+// 공통 모달 모양 (docs/design/goodplace-style-guide.md '모달').
 
 type ModalProps = {
   isOpen: boolean;
@@ -52,7 +51,7 @@ export function Modal({
   return (
     <dialog
       aria-labelledby={titleId}
-      className={`m-auto max-h-[calc(100dvh-2rem)] ${widthClassName} rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-[0_12px_40px_rgba(16,24,40,0.16)] outline-none backdrop:bg-black/40`}
+      className={`m-auto max-h-[calc(100dvh-2rem)] ${widthClassName} rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-(--shadow-pop) outline-none backdrop:bg-[var(--backdrop)]`}
       onClose={onClose}
       ref={dialogRef}
     >

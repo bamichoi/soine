@@ -3,6 +3,7 @@
 import { type KeyboardEvent, useState } from 'react';
 import { Icon } from '@/components/icon';
 import { createStringListItem, type StringListItem } from '@/lib/string-list';
+import { ICON_BUTTON_CLASS_NAME, INPUT_CLASS_NAME, SECONDARY_BUTTON_CLASS_NAME } from '@/lib/ui';
 
 type StringListInputProps = {
   inputId: string;
@@ -14,9 +15,6 @@ type StringListInputProps = {
   /** 목록의 보조기기용 이름 (예: "추가한 구성품") */
   listLabel: string;
 };
-
-const CONTROL_CLASS_NAME =
-  'h-10 w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
 
 // 한 칸에 적고 + 로 목록에 더한다. 더한 항목은 x 로 뺀다.
 export function StringListInput({
@@ -52,9 +50,9 @@ export function StringListInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <input
-          className={CONTROL_CLASS_NAME}
+          className={INPUT_CLASS_NAME}
           disabled={isFull}
           id={inputId}
           maxLength={maxLength}
@@ -64,7 +62,7 @@ export function StringListInput({
           value={draft}
         />
         <button
-          className="flex h-10 shrink-0 items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-medium hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
+          className={SECONDARY_BUTTON_CLASS_NAME}
           disabled={!draft.trim() || isFull}
           onClick={addDraft}
           type="button"
@@ -77,13 +75,13 @@ export function StringListInput({
         <ul aria-label={listLabel} className="flex flex-col">
           {items.map((item) => (
             <li
-              className="flex items-center justify-between gap-2 border-b border-[var(--line)] py-2 text-sm last:border-b-0"
+              className="flex items-center justify-between gap-2 border-b border-[var(--line)]/60 py-2 pl-1 text-[15px] last:border-b-0"
               key={item.key}
             >
               <span className="min-w-0 break-words">{item.value}</span>
               <button
                 aria-label={`${item.value} 빼기`}
-                className="flex size-7 shrink-0 items-center justify-center text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                className={ICON_BUTTON_CLASS_NAME}
                 onClick={() => onChange(items.filter((other) => other.key !== item.key))}
                 type="button"
               >

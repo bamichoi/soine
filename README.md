@@ -1,13 +1,13 @@
 # soine
 
-초이돌상(choidolsang) 서비스와 끼루(kkiru) 운영 도구를 담은 모노레포입니다.
+초이돌상(choidolsang) 서비스와 굿플레이스(goodplace) 운영 도구를 담은 모노레포입니다.
 
 ## 구조
 
 ```txt
 apps/
   choidolsang-web/   # Next.js — choidolsang.com (고객용)
-  backoffice/        # Next.js — admin.choidolsang.com (/choidolsang, /kkiru)
+  backoffice/        # Next.js — admin.choidolsang.com (/choidolsang, /goodplace)
   backend/           # NestJS — api.choidolsang.com
 packages/
   api-contract/      # OpenAPI 스펙/생성 타입

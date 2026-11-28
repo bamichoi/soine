@@ -1,4 +1,5 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
+import { DEFAULT_PAGE_SIZE, parsePageSize } from '@/lib/list-query';
 
 export const INQUIRY_STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled'] as const;
 export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
@@ -98,6 +99,8 @@ export type SortOrder = 'asc' | 'desc';
 
 export type InquiryListQuery = {
   page: number;
+  /** 한 페이지 개수. 기본 20 */
+  size: number;
   field: InquirySearchField;
   q: string;
   sort: InquirySortField;
@@ -111,6 +114,7 @@ export const DEFAULT_INQUIRY_LIST_QUERY: InquiryListQuery = {
   order: 'desc',
   page: 1,
   q: '',
+  size: DEFAULT_PAGE_SIZE,
   sort: 'inquiredOn',
   status: '',
 };
@@ -132,6 +136,7 @@ export function parseInquiryListQuery(params: URLSearchParams): InquiryListQuery
     order: order === 'asc' || order === 'desc' ? order : DEFAULT_INQUIRY_LIST_QUERY.order,
     page: Number.isInteger(page) && page >= 1 ? page : DEFAULT_INQUIRY_LIST_QUERY.page,
     q: params.get('q')?.slice(0, 100) ?? '',
+    size: parsePageSize(params.get('size')),
     sort: isOneOf(INQUIRY_SORT_FIELDS, sort) ? sort : DEFAULT_INQUIRY_LIST_QUERY.sort,
     status: isOneOf(INQUIRY_STATUSES, status) ? status : DEFAULT_INQUIRY_LIST_QUERY.status,
   };
@@ -141,7 +146,7 @@ export function parseInquiryListQuery(params: URLSearchParams): InquiryListQuery
 export function toInquiryListSearchParams(query: InquiryListQuery): URLSearchParams {
   const params = new URLSearchParams();
 
-  for (const key of ['page', 'field', 'q', 'status', 'sort', 'order'] as const) {
+  for (const key of ['page', 'size', 'field', 'q', 'status', 'sort', 'order'] as const) {
     if (query[key] !== DEFAULT_INQUIRY_LIST_QUERY[key] && query[key] !== '') {
       params.set(key, String(query[key]));
     }

@@ -9,6 +9,7 @@ import {
   listConceptOptions,
 } from '@/lib/choidolsang-concepts-api';
 import type { InquiryConceptRef } from '@/lib/choidolsang-inquiries-api';
+import { FOCUS_CLASS_NAME, INPUT_CLASS_NAME } from '@/lib/ui';
 
 type ConceptSelectProps = {
   id: string;
@@ -71,7 +72,7 @@ export function ConceptSelect({
     <div className="flex flex-col gap-1.5">
       <div className="relative">
         <select
-          className="h-10 w-full appearance-none border border-[var(--line)] bg-[var(--surface)] px-3 pr-9 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60"
+          className={`${INPUT_CLASS_NAME} cursor-pointer appearance-none pr-9 disabled:cursor-default`}
           disabled={state.kind !== 'loaded'}
           id={id}
           onChange={(event) =>
@@ -96,7 +97,7 @@ export function ConceptSelect({
           ))}
         </select>
         <Icon
-          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
+          className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-[var(--muted)]"
           name="chevron-down"
         />
       </div>
@@ -108,7 +109,10 @@ export function ConceptSelect({
       {state.kind === 'loaded' && options.length === 0 ? (
         <p className="text-xs text-[var(--muted)]">
           등록된 돌상 컨셉이 없습니다.{' '}
-          <Link className="underline underline-offset-2" href="/choidolsang/concepts/new">
+          <Link
+            className={`rounded-sm underline underline-offset-2 hover:text-[var(--brand)] ${FOCUS_CLASS_NAME}`}
+            href="/choidolsang/concepts/new"
+          >
             돌상 컨셉 추가
           </Link>
         </p>

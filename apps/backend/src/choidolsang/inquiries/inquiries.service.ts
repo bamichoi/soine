@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE, type Pagination, toPagination } from '../../common/page-size';
 import {
   type ChoidolsangConcept,
   type ChoidolsangInquiry,
@@ -24,7 +25,6 @@ import type {
 import type { UpdateInquiryDto } from './dto/update-inquiry.dto';
 import { generateInquiryCode, normalizeInquiryCode } from './inquiry-code';
 
-export const INQUIRY_PAGE_SIZE = 20;
 const CODE_GENERATION_ATTEMPTS = 5;
 
 /** 문의가 참조하는 돌상 컨셉 */
@@ -72,12 +72,7 @@ export type InquiryDetail = InquiryListItem & {
 
 export type InquiryListResponse = {
   items: InquiryListItem[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
+  pagination: Pagination;
 };
 
 type InquiryWhere = Prisma.ChoidolsangInquiryWhereInput;
@@ -248,6 +243,7 @@ export class ChoidolsangInquiriesService {
     field = 'all',
     order = 'desc',
     page = 1,
+    size = DEFAULT_PAGE_SIZE,
     q = '',
     sort = 'inquiredOn',
     status,
@@ -263,20 +259,15 @@ export class ChoidolsangInquiriesService {
         // 목록의 문의 내용은 첫 기록(첫 문의)만 보여 준다.
         include: { desiredConcept: true, records: { orderBy: RECORD_ORDER, take: 1 } },
         orderBy: buildInquiryOrderBy(sort, order),
-        skip: (page - 1) * INQUIRY_PAGE_SIZE,
-        take: INQUIRY_PAGE_SIZE,
+        skip: (page - 1) * size,
+        take: size,
         where,
       }),
     ]);
 
     return {
       items: inquiries.map(toListItem),
-      pagination: {
-        page,
-        pageSize: INQUIRY_PAGE_SIZE,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / INQUIRY_PAGE_SIZE)),
-      },
+      pagination: toPagination(page, size, total),
     };
   }
 

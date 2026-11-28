@@ -1,16 +1,15 @@
+import { StatusBadge } from '@/components/status-badge';
 import { INQUIRY_STATUS_LABELS, type InquiryStatus } from '@/lib/choidolsang-inquiries-api';
+import type { StatusTone } from '@/lib/ui';
 
-const STATUS_CLASS_NAMES: Record<InquiryStatus, string> = {
-  cancelled: 'bg-[var(--background)] text-[var(--muted)]',
-  confirmed: 'bg-[var(--success-soft)] text-[var(--success)]',
-  pending: 'bg-[var(--warning-soft)] text-[var(--warning)]',
-  rejected: 'bg-[var(--error-soft)] text-[var(--error)]',
+// 색은 그대로: 대기 노랑, 예약확정 초록, 거절 빨강, 취소 회색.
+const STATUS_TONES: Record<InquiryStatus, StatusTone> = {
+  cancelled: 'muted',
+  confirmed: 'done',
+  pending: 'idle',
+  rejected: 'negative',
 };
 
 export function InquiryStatusBadge({ status }: { status: InquiryStatus }) {
-  return (
-    <span className={`inline-flex px-2 py-0.5 text-xs ${STATUS_CLASS_NAMES[status]}`}>
-      {INQUIRY_STATUS_LABELS[status]}
-    </span>
-  );
+  return <StatusBadge label={INQUIRY_STATUS_LABELS[status]} tone={STATUS_TONES[status]} />;
 }

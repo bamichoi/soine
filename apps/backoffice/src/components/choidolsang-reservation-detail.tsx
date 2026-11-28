@@ -1,10 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { CopyCodeButton } from '@/components/copy-code-button';
-import { Icon } from '@/components/icon';
+import { DataLoader } from '@/components/data-loader';
+import {
+  DetailHead,
+  InfoGroup,
+  InfoItem,
+  InfoLink,
+  InfoSheet,
+  InfoTextGroup,
+} from '@/components/detail-parts';
+import { PhoneNumber } from '@/components/phone-number';
 import { ReservationStatusBadge } from '@/components/reservation-status-badge';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import { formatInquiryDate, formatSeoulDateTime } from '@/lib/choidolsang-inquiries-api';
@@ -16,10 +24,11 @@ import {
   type Reservation,
 } from '@/lib/choidolsang-reservations-api';
 import { formatWon } from '@/lib/money';
-import { formatPhone } from '@/lib/phone';
-
-const SECONDARY_BUTTON_CLASS_NAME =
-  'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
+import {
+  DANGER_BUTTON_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 function getStatusErrorMessage(error: unknown, action: string): string {
   return error instanceof AdminApiError && error.status === 409
@@ -27,173 +36,42 @@ function getStatusErrorMessage(error: unknown, action: string): string {
     : `${action}하지 못했습니다. 잠시 후 다시 시도해 주세요.`;
 }
 
-function InfoItem({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="text-sm break-words">{children}</dd>
-    </div>
-  );
-}
-
-function AmountRow({
-  label,
-  amount,
-  strong = false,
-}: {
-  label: string;
-  amount: number;
-  strong?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-sm text-[var(--muted)]">{label}</dt>
-      <dd className={`tabular-nums ${strong ? 'text-base font-semibold' : 'text-sm'}`}>
-        {formatWon(amount)}
-      </dd>
-    </div>
-  );
-}
-
-function ReservationBody({ reservation }: { reservation: Reservation }) {
-  const { concept } = reservation;
-
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p className="flex items-center gap-2 text-sm">
-            <span className="text-[var(--muted)]">예약 번호</span>
-            <span className="font-mono tracking-wide">{reservation.code}</span>
-            <CopyCodeButton code={reservation.code} label="예약 번호" />
-          </p>
-          <Link
-            className="flex h-7 items-center border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium hover:bg-[var(--background)]"
-            href={`/choidolsang/inquiries/${reservation.inquiryCode}`}
-          >
-            문의 기록
-          </Link>
-        </div>
-        <ReservationStatusBadge status={reservation.status} />
-      </header>
-
-      <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        <InfoItem label="예약자 성함">{reservation.customerName}</InfoItem>
-        <InfoItem label="예약자 연락처">
-          <span className="flex flex-wrap items-center gap-3">
-            <span className="tabular-nums">{formatPhone(reservation.customerPhone)}</span>
-            {/* 모바일에서만 바로 전화를 걸 수 있게 한다. */}
-            <a
-              className="inline-flex h-8 items-center gap-1.5 border border-[var(--brand)] px-3 text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand-soft)] md:hidden"
-              href={`tel:${reservation.customerPhone}`}
-            >
-              <Icon className="size-3.5" name="phone" />
-              전화 걸기
-            </a>
-          </span>
-        </InfoItem>
-        <InfoItem label="행사 날짜·시간">{formatSeoulDateTime(reservation.eventAt)}</InfoItem>
-        <InfoItem label="행사 장소">{reservation.eventLocation}</InfoItem>
-        <InfoItem label="참석 인원">{reservation.guestCount}명</InfoItem>
-        <InfoItem label="아기 이름">{reservation.babyName}</InfoItem>
-        <InfoItem label="아기 성별">{BABY_GENDER_LABELS[reservation.babyGender]}</InfoItem>
-        <InfoItem label="돌상 컨셉">
-          {concept.isDeleted ? (
-            <>
-              {concept.name} <span className="text-[var(--muted)]">(삭제됨)</span>
-            </>
-          ) : (
-            <Link
-              className="text-[var(--brand)] underline-offset-2 hover:underline"
-              href={`/choidolsang/concepts/${concept.id}`}
-            >
-              {concept.name}
-            </Link>
-          )}
-        </InfoItem>
-        <InfoItem label="스냅 촬영">{reservation.hasSnap ? '포함' : '미포함'}</InfoItem>
-        <InfoItem label="예약 확정 날짜">{formatInquiryDate(reservation.confirmedOn)}</InfoItem>
-      </dl>
-
-      <section
-        aria-label="추가 요청"
-        className="flex flex-col gap-4 bg-[var(--background)] px-5 py-4"
-      >
-        <div className="flex flex-col gap-1.5">
-          <h3 className="text-xs text-[var(--muted)]">추가 요청 구성품</h3>
-          {reservation.extraComponents.length > 0 ? (
-            <ul className="flex flex-col gap-1 text-sm">
-              {reservation.extraComponents.map((component, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: 읽기 전용 목록이라 순서가 바뀌지 않고, 같은 이름이 있을 수 있다.
-                <li className="flex gap-2 break-words" key={`${index}-${component}`}>
-                  <span aria-hidden="true" className="text-[var(--muted)]">
-                    ·
-                  </span>
-                  {component}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[var(--muted)]">없음</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <h3 className="text-xs text-[var(--muted)]">추가 요청 사항</h3>
-          <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-            {reservation.requests ?? <span className="text-[var(--muted)]">없음</span>}
-          </p>
-        </div>
-      </section>
-
-      <dl aria-label="금액" className="flex flex-col gap-2 border-t border-[var(--line)] pt-5">
-        <AmountRow amount={reservation.totalAmount} label="최종 결제 금액" />
-        <AmountRow amount={reservation.depositAmount} label="예약금" />
-        <AmountRow amount={reservation.balanceAmount} label="잔금" strong />
-      </dl>
-    </div>
-  );
-}
-
 type ReservationActionsProps = {
   reservation: Reservation;
   onChange: (reservation: Reservation) => void;
 };
 
-// 예약중일 때만: 왼쪽 [수정] / 오른쪽 [예약 취소] [업무 완료]
+// 제목 줄 오른쪽 버튼. 예약중일 때만: [수정] [예약 취소] [업무 완료]
+// 완료·취소환불된 예약은 기록으로 남기므로 버튼이 없다.
 function ReservationActions({ reservation, onChange }: ReservationActionsProps) {
   const [dialog, setDialog] = useState<'cancel' | 'complete' | null>(null);
-  const isReserved = reservation.status === 'reserved';
 
-  // 완료·취소환불된 예약은 기록으로 남기므로 버튼이 없다.
-  if (!isReserved) {
+  if (reservation.status !== 'reserved') {
     return null;
   }
 
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
+    <>
       <Link
         className={SECONDARY_BUTTON_CLASS_NAME}
         href={`/choidolsang/reservations/${reservation.code}/edit`}
       >
         수정
       </Link>
-
-      <div className="flex gap-2">
-        <button
-          className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
-          onClick={() => setDialog('cancel')}
-          type="button"
-        >
-          예약 취소
-        </button>
-        <button
-          className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)]"
-          onClick={() => setDialog('complete')}
-          type="button"
-        >
-          업무 완료
-        </button>
-      </div>
+      <button
+        className={DANGER_BUTTON_CLASS_NAME}
+        onClick={() => setDialog('cancel')}
+        type="button"
+      >
+        예약 취소
+      </button>
+      <button
+        className={PRIMARY_BUTTON_CLASS_NAME}
+        onClick={() => setDialog('complete')}
+        type="button"
+      >
+        업무 완료
+      </button>
 
       <ConfirmDialog
         confirmLabel="예약 취소"
@@ -232,67 +110,94 @@ function ReservationActions({ reservation, onChange }: ReservationActionsProps) 
         pendingLabel="처리 중..."
         title="업무 완료"
       />
-    </footer>
+    </>
   );
 }
 
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; reservation: Reservation };
+/** 추가 요청 구성품은 한 줄에 하나씩 */
+function toComponentLines(components: string[]): string | null {
+  return components.length > 0 ? components.map((component) => `· ${component}`).join('\n') : null;
+}
 
-export function ChoidolsangReservationDetail({ code }: { code: string }) {
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-    setState({ kind: 'loading' });
-
-    getReservation(code)
-      .then((reservation) => {
-        if (isActive) {
-          setState({ kind: 'loaded', reservation });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">예약을 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 예약을 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        예약을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
+function ReservationBody({ reservation, onChange }: ReservationActionsProps) {
+  const { concept } = reservation;
 
   return (
-    <article className="flex flex-col border border-[var(--line)] bg-[var(--surface)]">
-      <ReservationBody reservation={state.reservation} />
-      <ReservationActions
-        onChange={(reservation) => setState({ kind: 'loaded', reservation })}
-        reservation={state.reservation}
+    <article>
+      <DetailHead
+        actions={<ReservationActions onChange={onChange} reservation={reservation} />}
+        badge={<ReservationStatusBadge status={reservation.status} />}
+        code={reservation.code}
+        codeLabel="예약"
+        copyLabel="예약 번호"
+        title={reservation.customerName}
       />
+
+      {/* 예약자 이름은 제목에만 둔다. 묶음 순서(사람 → 행사 → 상품 → 금액)로만 중요도를 준다. */}
+      <InfoSheet label="예약 정보">
+        <InfoGroup title="예약자">
+          <InfoItem label="연락처">
+            <PhoneNumber phone={reservation.customerPhone} />
+          </InfoItem>
+          <InfoItem label="아기 이름">{reservation.babyName}</InfoItem>
+          <InfoItem label="아기 성별">{BABY_GENDER_LABELS[reservation.babyGender]}</InfoItem>
+          <InfoItem label="문의">
+            <InfoLink href={`/choidolsang/inquiries/${reservation.inquiryCode}`}>
+              <span className="font-mono text-[13px]" translate="no">
+                {reservation.inquiryCode}
+              </span>
+            </InfoLink>
+          </InfoItem>
+        </InfoGroup>
+        <InfoGroup title="행사">
+          <InfoItem label="행사 날짜·시간">
+            <span className="tabular-nums">{formatSeoulDateTime(reservation.eventAt)}</span>
+          </InfoItem>
+          <InfoItem label="행사 장소">{reservation.eventLocation}</InfoItem>
+          <InfoItem label="참석 인원">
+            <span className="tabular-nums">{reservation.guestCount}명</span>
+          </InfoItem>
+          <InfoItem label="예약 확정 날짜">
+            <span className="tabular-nums">{formatInquiryDate(reservation.confirmedOn)}</span>
+          </InfoItem>
+        </InfoGroup>
+        <InfoGroup title="상품">
+          <InfoItem className="col-span-2 md:col-span-3" label="돌상 컨셉">
+            {concept.isDeleted ? (
+              <>
+                {concept.name} <span className="text-[var(--muted)]">(삭제됨)</span>
+              </>
+            ) : (
+              <InfoLink href={`/choidolsang/concepts/${concept.id}`}>{concept.name}</InfoLink>
+            )}
+          </InfoItem>
+          <InfoItem label="스냅 촬영">{reservation.hasSnap ? '포함' : '미포함'}</InfoItem>
+        </InfoGroup>
+        <InfoTextGroup
+          text={toComponentLines(reservation.extraComponents)}
+          title="추가 요청 구성품"
+        />
+        <InfoTextGroup text={reservation.requests} title="추가 요청 사항" />
+        <InfoGroup title="금액">
+          <InfoItem isMoney label="최종 결제 금액">
+            {formatWon(reservation.totalAmount)}
+          </InfoItem>
+          <InfoItem isMoney label="예약금">
+            {formatWon(reservation.depositAmount)}
+          </InfoItem>
+          <InfoItem isMoney label="잔금">
+            {formatWon(reservation.balanceAmount)}
+          </InfoItem>
+        </InfoGroup>
+      </InfoSheet>
     </article>
+  );
+}
+
+export function ChoidolsangReservationDetail({ code }: { code: string }) {
+  return (
+    <DataLoader load={getReservation} loadKey={code} noun="예약">
+      {(reservation, replace) => <ReservationBody onChange={replace} reservation={reservation} />}
+    </DataLoader>
   );
 }

@@ -2,8 +2,16 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { type ReactNode, useEffect, useState } from 'react';
-import { CopyCodeButton } from '@/components/copy-code-button';
+import { useState } from 'react';
+import { DataLoader } from '@/components/data-loader';
+import {
+  DetailHead,
+  InfoGroup,
+  InfoItem,
+  InfoLink,
+  InfoSheet,
+  InfoTextGroup,
+} from '@/components/detail-parts';
 import { InquiryContentLog } from '@/components/inquiry-content-log';
 import { InquiryRejectDialog } from '@/components/inquiry-reject-dialog';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
@@ -11,34 +19,22 @@ import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   formatInquiryDate,
   formatSeoulDateTime,
+  getFirstLine,
   getInquiry,
   type InquiryDetail,
   reopenInquiry,
 } from '@/lib/choidolsang-inquiries-api';
-
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; inquiry: InquiryDetail };
-
-const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
-
-const SECONDARY_BUTTON_CLASS_NAME =
-  'h-10 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50';
+import {
+  DANGER_BUTTON_CLASS_NAME,
+  EMPTY_VALUE,
+  ERROR_BOX_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 const LIST_PATH = '/choidolsang/inquiries';
 
 const STALE_STATUS_MESSAGE = '이미 처리된 문의입니다. 화면을 새로고침해 주세요.';
-
-function InfoItem({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="text-sm break-words">{children}</dd>
-    </div>
-  );
-}
 
 // 삭제되지 않은 컨셉은 돌상 컨셉 상세로 이동할 수 있다.
 function DesiredConcept({ concept }: { concept: InquiryDetail['desiredConcept'] }) {
@@ -54,109 +50,34 @@ function DesiredConcept({ concept }: { concept: InquiryDetail['desiredConcept'] 
     );
   }
 
-  return (
-    <Link
-      className="text-[var(--brand)] underline-offset-2 hover:underline"
-      href={`/choidolsang/concepts/${concept.id}`}
-    >
-      {concept.name}
-    </Link>
-  );
-}
-
-function InquiryBody({ inquiry, onChange }: InquiryActionsProps) {
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <header className="flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-sm">
-          <span className="text-[var(--muted)]">문의 번호</span>
-          <span className="font-mono tracking-wide">{inquiry.code}</span>
-          <CopyCodeButton code={inquiry.code} label="문의 번호" />
-        </p>
-        <InquiryStatusBadge status={inquiry.status} />
-      </header>
-
-      <InquiryContentLog inquiry={inquiry} onChange={onChange} />
-
-      <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        <InfoItem label="문의 날짜">{formatInquiryDate(inquiry.inquiredOn)}</InfoItem>
-        <InfoItem label="희망 예약일시">
-          {inquiry.desiredReservationAt
-            ? formatSeoulDateTime(inquiry.desiredReservationAt)
-            : EMPTY_VALUE}
-        </InfoItem>
-        <InfoItem label="장소">{inquiry.location ?? EMPTY_VALUE}</InfoItem>
-        <InfoItem label="희망 돌상 컨셉">
-          <DesiredConcept concept={inquiry.desiredConcept} />
-        </InfoItem>
-      </dl>
-
-      {inquiry.status === 'rejected' && inquiry.rejectionReason ? (
-        <section
-          aria-label="거절 사유"
-          className="flex flex-col gap-1 bg-[var(--error-soft)] px-5 py-4"
-        >
-          <h3 className="text-xs font-medium text-[var(--error)]">거절 사유</h3>
-          <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-            {inquiry.rejectionReason}
-          </p>
-        </section>
-      ) : null}
-    </div>
-  );
+  return <InfoLink href={`/choidolsang/concepts/${concept.id}`}>{concept.name}</InfoLink>;
 }
 
 type InquiryActionsProps = {
   inquiry: InquiryDetail;
   onChange: (inquiry: InquiryDetail) => void;
+  onError: (message: string) => void;
 };
 
-const PRIMARY_BUTTON_CLASS_NAME =
-  'h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-50';
-
-// 예약확정·취소 문의는 이어진 예약으로 간다.
-function ReservationLink({ reservationCode }: { reservationCode: string | null }) {
-  if (!reservationCode) {
-    return (
-      <button
-        className={PRIMARY_BUTTON_CLASS_NAME}
-        disabled
-        title="이어진 예약이 없습니다."
-        type="button"
-      >
-        예약 정보
-      </button>
-    );
-  }
-
-  return (
-    <Link
-      className={`${PRIMARY_BUTTON_CLASS_NAME} flex items-center`}
-      href={`/choidolsang/reservations/${reservationCode}`}
-    >
-      예약 정보
-    </Link>
-  );
-}
-
-// 상태별 버튼 — 대기: [거절] [예약 진행] / 거절: [대기] [예약 진행] / 예약확정·취소: [예약 정보]
-function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
+// 제목 줄 오른쪽 버튼 (보조 → 위험 → 주).
+// 대기: [수정] [거절] [예약 진행] / 거절: [수정] [대기] [예약 진행] / 예약확정·취소: [수정] [예약 정보]
+// 문의는 삭제하지 않는다.
+function InquiryActions({ inquiry, onChange, onError }: InquiryActionsProps) {
+  const searchParams = useSearchParams();
+  const listQuery = searchParams.toString();
+  const querySuffix = listQuery ? `?${listQuery}` : '';
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  if (inquiry.status === 'confirmed' || inquiry.status === 'cancelled') {
-    return <ReservationLink reservationCode={inquiry.reservationCode} />;
-  }
+  const isClosed = inquiry.status === 'confirmed' || inquiry.status === 'cancelled';
 
   async function handleReopen() {
-    setErrorMessage('');
+    onError('');
     setIsReopening(true);
 
     try {
       onChange(await reopenInquiry(inquiry.code));
     } catch (error) {
-      setErrorMessage(
+      onError(
         error instanceof AdminApiError && error.status === 409
           ? STALE_STATUS_MESSAGE
           : '대기로 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -167,38 +88,59 @@ function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-3">
-      {errorMessage ? (
-        <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
-          {errorMessage}
-        </p>
+    <>
+      <Link
+        className={SECONDARY_BUTTON_CLASS_NAME}
+        href={`${LIST_PATH}/${inquiry.code}/edit${querySuffix}`}
+      >
+        수정
+      </Link>
+      {inquiry.status === 'pending' ? (
+        <button
+          className={DANGER_BUTTON_CLASS_NAME}
+          onClick={() => setIsRejectOpen(true)}
+          type="button"
+        >
+          거절
+        </button>
       ) : null}
-      <div className="flex gap-2">
-        {inquiry.status === 'pending' ? (
-          <button
-            className={`${SECONDARY_BUTTON_CLASS_NAME} text-[var(--error)]`}
-            onClick={() => setIsRejectOpen(true)}
-            type="button"
+      {inquiry.status === 'rejected' ? (
+        <button
+          className={SECONDARY_BUTTON_CLASS_NAME}
+          disabled={isReopening}
+          onClick={handleReopen}
+          type="button"
+        >
+          {isReopening ? '변경 중...' : '대기'}
+        </button>
+      ) : null}
+      {isClosed ? (
+        // 예약확정·취소 문의는 이어진 예약으로 간다.
+        inquiry.reservationCode ? (
+          <Link
+            className={PRIMARY_BUTTON_CLASS_NAME}
+            href={`/choidolsang/reservations/${inquiry.reservationCode}`}
           >
-            거절
-          </button>
+            예약 정보
+          </Link>
         ) : (
           <button
-            className={SECONDARY_BUTTON_CLASS_NAME}
-            disabled={isReopening}
-            onClick={handleReopen}
+            className={PRIMARY_BUTTON_CLASS_NAME}
+            disabled
+            title="이어진 예약이 없습니다."
             type="button"
           >
-            {isReopening ? '변경 중...' : '대기'}
+            예약 정보
           </button>
-        )}
+        )
+      ) : (
         <Link
-          className={`${PRIMARY_BUTTON_CLASS_NAME} flex items-center`}
+          className={PRIMARY_BUTTON_CLASS_NAME}
           href={`/choidolsang/reservations/new?inquiry=${inquiry.code}`}
         >
           예약 진행
         </Link>
-      </div>
+      )}
 
       <InquiryRejectDialog
         code={inquiry.code}
@@ -209,81 +151,73 @@ function StatusActions({ inquiry, onChange }: InquiryActionsProps) {
           onChange(rejected);
         }}
       />
-    </div>
+    </>
   );
 }
 
-// 왼쪽: [수정] [삭제] / 오른쪽: 상태별 버튼
-function InquiryActions({ inquiry, onChange }: InquiryActionsProps) {
-  const searchParams = useSearchParams();
-  const listQuery = searchParams.toString();
-  const querySuffix = listQuery ? `?${listQuery}` : '';
+function InquiryBody({
+  inquiry,
+  onChange,
+}: {
+  inquiry: InquiryDetail;
+  onChange: (inquiry: InquiryDetail) => void;
+}) {
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // 문의는 삭제하지 않는다. 수정과 상태별 버튼만 둔다.
   return (
-    <footer className="flex flex-wrap items-start justify-between gap-3 border-t border-[var(--line)] px-6 py-4">
-      <Link
-        className={`${SECONDARY_BUTTON_CLASS_NAME} flex items-center`}
-        href={`${LIST_PATH}/${inquiry.code}/edit${querySuffix}`}
-      >
-        수정
-      </Link>
+    <article>
+      <DetailHead
+        actions={<InquiryActions inquiry={inquiry} onChange={onChange} onError={setErrorMessage} />}
+        badge={<InquiryStatusBadge status={inquiry.status} />}
+        code={inquiry.code}
+        codeLabel="문의"
+        copyLabel="문의 번호"
+        title={getFirstLine(inquiry.content)}
+      />
 
-      <StatusActions inquiry={inquiry} onChange={onChange} />
-    </footer>
+      {errorMessage ? (
+        <p className={`mb-3 ${ERROR_BOX_CLASS_NAME}`} role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <InfoSheet label="문의 정보">
+        <InfoGroup title="희망 예약">
+          <InfoItem label="문의 날짜">
+            <span className="tabular-nums">{formatInquiryDate(inquiry.inquiredOn)}</span>
+          </InfoItem>
+          <InfoItem label="희망 예약일시">
+            {inquiry.desiredReservationAt ? (
+              <span className="tabular-nums">
+                {formatSeoulDateTime(inquiry.desiredReservationAt)}
+              </span>
+            ) : (
+              EMPTY_VALUE
+            )}
+          </InfoItem>
+          <InfoItem label="장소">{inquiry.location ?? EMPTY_VALUE}</InfoItem>
+          <InfoItem label="희망 돌상 컨셉">
+            <DesiredConcept concept={inquiry.desiredConcept} />
+          </InfoItem>
+        </InfoGroup>
+        {inquiry.status === 'rejected' && inquiry.rejectionReason ? (
+          <InfoTextGroup
+            text={inquiry.rejectionReason}
+            title="거절 사유"
+            titleClassName="text-[var(--error)]"
+          />
+        ) : null}
+      </InfoSheet>
+
+      <InquiryContentLog inquiry={inquiry} onChange={onChange} />
+    </article>
   );
 }
 
 export function ChoidolsangInquiryDetail({ code }: { code: string }) {
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-    setState({ kind: 'loading' });
-
-    getInquiry(code)
-      .then((inquiry) => {
-        if (isActive) {
-          setState({ inquiry, kind: 'loaded' });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">문의를 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 문의를 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        문의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  const handleChange = (inquiry: InquiryDetail) => setState({ inquiry, kind: 'loaded' });
-
   return (
-    <article className="flex flex-col border border-[var(--line)] bg-[var(--surface)]">
-      <InquiryBody inquiry={state.inquiry} onChange={handleChange} />
-      <InquiryActions inquiry={state.inquiry} onChange={handleChange} />
-    </article>
+    <DataLoader load={getInquiry} loadKey={code} noun="문의">
+      {(inquiry, replace) => <InquiryBody inquiry={inquiry} onChange={replace} />}
+    </DataLoader>
   );
 }

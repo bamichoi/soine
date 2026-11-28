@@ -1,10 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE, type Pagination, toPagination } from '../../common/page-size';
 import type { ChoidolsangConcept, Prisma } from '../../generated/prisma/client';
 // biome-ignore lint/style/useImportType: NestJS needs the runtime value for dependency injection metadata.
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ConceptDto, ConceptSearchField, ListConceptsQueryDto } from './dto/concept.dto';
-
-export const CONCEPT_PAGE_SIZE = 20;
 
 export type Concept = {
   id: string;
@@ -26,12 +25,7 @@ export type ConceptOption = {
 
 export type ConceptListResponse = {
   items: Concept[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
+  pagination: Pagination;
 };
 
 // 숨김 삭제한 컨셉은 어디서도 보이지 않는다.
@@ -64,6 +58,7 @@ export class ChoidolsangConceptsService {
     field = 'all',
     order = 'desc',
     page = 1,
+    size = DEFAULT_PAGE_SIZE,
     q = '',
     sort = 'createdAt',
   }: ListConceptsQueryDto = {}): Promise<ConceptListResponse> {
@@ -79,20 +74,15 @@ export class ChoidolsangConceptsService {
           sort === 'createdAt'
             ? [{ createdAt: order }, { id: 'asc' }]
             : [{ [sort]: order }, { createdAt: 'desc' }, { id: 'asc' }],
-        skip: (page - 1) * CONCEPT_PAGE_SIZE,
-        take: CONCEPT_PAGE_SIZE,
+        skip: (page - 1) * size,
+        take: size,
         where,
       }),
     ]);
 
     return {
       items: concepts.map(toConcept),
-      pagination: {
-        page,
-        pageSize: CONCEPT_PAGE_SIZE,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / CONCEPT_PAGE_SIZE)),
-      },
+      pagination: toPagination(page, size, total),
     };
   }
 

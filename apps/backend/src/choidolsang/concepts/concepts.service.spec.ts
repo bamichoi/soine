@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/page-size';
 import type { PrismaService } from '../../prisma/prisma.service';
-import { ChoidolsangConceptsService, CONCEPT_PAGE_SIZE } from './concepts.service';
+import { ChoidolsangConceptsService } from './concepts.service';
 
 const CONCEPT = {
   components: ['상차림 테이블', '떡 모형', '꽃 장식'],
@@ -37,17 +38,24 @@ describe('ChoidolsangConceptsService', () => {
 
     expect(concept.findMany).toHaveBeenCalledWith({
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      skip: CONCEPT_PAGE_SIZE,
-      take: CONCEPT_PAGE_SIZE,
+      skip: DEFAULT_PAGE_SIZE,
+      take: DEFAULT_PAGE_SIZE,
       where: { deletedAt: null },
     });
     expect(result.pagination).toEqual({
       page: 2,
-      pageSize: CONCEPT_PAGE_SIZE,
+      pageSize: DEFAULT_PAGE_SIZE,
       total: 21,
       totalPages: 2,
     });
     expect(result.items[0]).toMatchObject({ name: '한복 클래식', price: 250000 });
+  });
+
+  it('uses the requested page size', async () => {
+    const result = await service.list({ page: 2, size: 50 });
+
+    expect(concept.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 50, take: 50 }));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 50, total: 21, totalPages: 1 });
   });
 
   it('searches by name case-insensitively', async () => {

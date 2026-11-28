@@ -1,7 +1,7 @@
 'use client';
 
-import { toManwonText } from '@/lib/kkiru-format';
-import { INPUT_CLASS_NAME, INPUT_UNIT_CLASS_NAME } from '@/lib/kkiru-ui';
+import { toManwonText } from '@/lib/goodplace-format';
+import { INPUT_CLASS_NAME, INPUT_UNIT_CLASS_NAME } from '@/lib/ui';
 
 type ManwonInputProps = {
   id: string;
@@ -10,7 +10,7 @@ type ManwonInputProps = {
   required?: boolean;
 };
 
-// 만원 단위 금액 입력칸. 숫자만 받고 쉼표를 붙인다. 현재 끼루 전용(끼루 회색 입력칸 모양).
+// 만원 단위 금액 입력칸. 숫자만 받고 쉼표를 붙인다. 회색 둥근 입력칸 모양.
 export function ManwonInput({ id, value, onChange, required = false }: ManwonInputProps) {
   return (
     <div className="relative sm:w-56">

@@ -4,15 +4,15 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Icon } from '@/components/icon';
-import { KkiruChip, KkiruNotice, KkiruPageHead } from '@/components/kkiru-parts';
+import { Chip, Notice, PageHead } from '@/components/page-parts';
 import { Pagination } from '@/components/pagination';
+import { type ListQuery, type Paginated, parsePageSize, toListParams } from '@/lib/list-query';
 import {
   FOCUS_CLASS_NAME,
   PRIMARY_BUTTON_CLASS_NAME,
   SMALL_BUTTON_CLASS_NAME,
   TEXT_BUTTON_CLASS_NAME,
-} from '@/lib/kkiru-ui';
-import { type ListQuery, type Paginated, toListParams } from '@/lib/list-query';
+} from '@/lib/ui';
 
 type SortOrder = 'asc' | 'desc';
 
@@ -30,6 +30,16 @@ export type ListColumn<T> = {
 
 export type ListOption = { value: string; label: string };
 
+/** 첫 열 링크. 행 전체가 이 링크로 이동한다. */
+export type RowLink = {
+  href: string;
+  label: string;
+  text: string;
+  extra?: ReactNode;
+  /** 번호가 아니라 이름이면 true (고정폭·회색 대신 굵은 글자) */
+  isName?: boolean;
+};
+
 type ListTableProps<T extends { id: string }> = {
   title: string;
   unit: string;
@@ -44,55 +54,41 @@ type ListTableProps<T extends { id: string }> = {
    * 첫 열(번호) 링크. 행 전체가 이 링크로 이동한다.
    * listQuery는 지금 목록 조건('?q=...' 또는 '')으로, 상세에서 목록으로 돌아올 때 쓸 수 있다.
    */
-  rowLink: (
-    item: T,
-    listQuery: string,
-  ) => { href: string; label: string; text: string; extra?: ReactNode };
+  rowLink: (item: T, listQuery: string) => RowLink;
   load: (query: ListQuery) => Promise<Paginated<T>>;
   emptyText: string;
   minWidth: string;
   addLink?: { href: string; label: string };
-  /**
-   * 'kkiru'면 끼루 모양(docs/design/kkiru-style-guide.md '표'·'필터 바').
-   * 기본 'default'는 지금 모양 그대로다. 기능(검색·정렬·상태 필터·페이지·주소 쿼리)은 같다.
-   */
-  look?: 'default' | 'kkiru';
 };
 
-type LoadState<T> =
+export type ListLoadState<T> =
   | { kind: 'loading' }
   | { kind: 'error' }
   | { kind: 'loaded'; data: Paginated<T> };
 
-const CONTROL_CLASS_NAME =
-  'h-10 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)]';
-const BUTTON_CLASS_NAME =
-  'h-10 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
 const SORT_ICONS = { asc: 'arrow-up', desc: 'arrow-down' } as const;
 const ARIA_SORT = { asc: 'ascending', desc: 'descending' } as const;
 
-function ListRow<T>({
-  columns,
-  item,
-  link,
-}: {
-  columns: ListColumn<T>[];
-  item: T;
-  link: { href: string; label: string; text: string; extra?: ReactNode };
-}) {
+function ListRow<T>({ columns, item, link }: { columns: ListColumn<T>[]; item: T; link: RowLink }) {
   return (
-    <tr className="relative cursor-pointer border-b border-[var(--line)] last:border-b-0 hover:bg-[var(--background)] has-[a:focus-visible]:bg-[var(--brand-soft)]">
+    <tr className="relative cursor-pointer border-b border-[var(--line)]/40 last:border-b-0 hover:bg-[var(--background)]/60 has-[a:focus-visible]:bg-[var(--brand-soft)]">
       {columns.map((column, index) => (
         <td
-          className={`px-4 py-3 ${column.align === 'right' ? 'text-right whitespace-nowrap tabular-nums' : ''}`}
+          className={`px-5 py-3.5 ${column.align === 'right' ? 'text-right whitespace-nowrap tabular-nums' : ''}`}
           key={column.key}
         >
           {index === 0 ? (
-            <span className="flex items-center gap-1">
+            <span className="flex min-w-0 items-center gap-1">
               <Link
                 aria-label={link.label}
-                className="font-mono text-[13px] tracking-wide whitespace-nowrap outline-none after:absolute after:inset-0"
+                className={`outline-none after:absolute after:inset-0 ${
+                  link.isName
+                    ? 'block min-w-0 truncate font-semibold'
+                    : 'font-mono text-[13px] tracking-wide whitespace-nowrap text-[var(--muted)]'
+                }`}
                 href={link.href}
+                title={link.isName ? link.text : undefined}
+                translate={link.isName ? undefined : 'no'}
               >
                 {link.text}
               </Link>
@@ -108,154 +104,6 @@ function ListRow<T>({
 }
 
 function ColumnHeader<T>({
-  column,
-  order,
-  onSort,
-}: {
-  column: ListColumn<T>;
-  /** 이 열로 정렬 중이면 정렬 방향, 아니면 null */
-  order: SortOrder | null;
-  onSort: (column: ListColumn<T>) => void;
-}) {
-  const isRight = column.align === 'right';
-
-  return (
-    <th
-      aria-sort={order ? ARIA_SORT[order] : undefined}
-      className={`px-4 py-3 font-medium whitespace-nowrap ${isRight ? 'text-right' : ''} ${column.className ?? ''}`}
-      scope="col"
-    >
-      {column.sortField ? (
-        <button
-          className={`inline-flex items-center gap-1 hover:text-[var(--foreground)] ${isRight ? 'flex-row-reverse' : ''}`}
-          onClick={() => onSort(column)}
-          type="button"
-        >
-          {column.label}
-          <Icon
-            className={`size-3.5 ${order ? 'text-[var(--brand)]' : 'opacity-50'}`}
-            name={order ? SORT_ICONS[order] : 'chevrons-up-down'}
-          />
-        </button>
-      ) : (
-        column.label
-      )}
-    </th>
-  );
-}
-
-function TableMessage<T>({
-  state,
-  hasFilter,
-  title,
-  emptyText,
-  onRetry,
-}: {
-  state: LoadState<T>;
-  hasFilter: boolean;
-  title: string;
-  emptyText: string;
-  onRetry: () => void;
-}) {
-  if (state.kind === 'loading') {
-    return <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <div className="flex flex-col items-center gap-3 px-4 py-10" role="alert">
-        <p className="text-sm text-[var(--error)]">{title}을(를) 불러오지 못했습니다.</p>
-        <button className={BUTTON_CLASS_NAME} onClick={onRetry} type="button">
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  return state.data.items.length === 0 ? (
-    <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-      {hasFilter ? '검색 결과가 없습니다.' : emptyText}
-    </p>
-  ) : null;
-}
-
-function SelectBox({
-  label,
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  label: string;
-  value: string;
-  options: ListOption[];
-  onChange: (value: string) => void;
-  className: string;
-}) {
-  return (
-    <div className="relative">
-      <select
-        aria-label={label}
-        className={`${CONTROL_CLASS_NAME} ${className} appearance-none pr-9`}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <Icon
-        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-        name="chevron-down"
-      />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- 끼루 모양
-
-type RowLink = { href: string; label: string; text: string; extra?: ReactNode };
-
-function KkiruListRow<T>({
-  columns,
-  item,
-  link,
-}: {
-  columns: ListColumn<T>[];
-  item: T;
-  link: RowLink;
-}) {
-  return (
-    <tr className="relative cursor-pointer border-b border-[var(--line)]/40 last:border-b-0 hover:bg-[var(--background)]/60 has-[a:focus-visible]:bg-[var(--brand-soft)]">
-      {columns.map((column, index) => (
-        <td
-          className={`px-5 py-3.5 ${column.align === 'right' ? 'text-right whitespace-nowrap tabular-nums' : ''}`}
-          key={column.key}
-        >
-          {index === 0 ? (
-            <span className="flex items-center gap-1">
-              <Link
-                aria-label={link.label}
-                className="font-mono text-[13px] tracking-wide whitespace-nowrap text-[var(--muted)] outline-none after:absolute after:inset-0"
-                href={link.href}
-                translate="no"
-              >
-                {link.text}
-              </Link>
-              {link.extra}
-            </span>
-          ) : (
-            column.render(item)
-          )}
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-function KkiruColumnHeader<T>({
   column,
   order,
   onSort,
@@ -292,21 +140,21 @@ function KkiruColumnHeader<T>({
 }
 
 /** 표 카드 안의 불러오는 중·없음·오류 */
-function KkiruTableMessage<T>({
+function TableMessage<T>({
   state,
   hasFilter,
   title,
   emptyText,
   onRetry,
 }: {
-  state: LoadState<T>;
+  state: ListLoadState<T>;
   hasFilter: boolean;
   title: string;
   emptyText: string;
   onRetry: () => void;
 }) {
   if (state.kind === 'loading') {
-    return <KkiruNotice text="불러오고 있습니다." />;
+    return <Notice text="불러오고 있습니다." />;
   }
 
   if (state.kind === 'error') {
@@ -321,11 +169,11 @@ function KkiruTableMessage<T>({
   }
 
   return state.data.items.length === 0 ? (
-    <KkiruNotice text={hasFilter ? '검색 결과가 없습니다.' : emptyText} />
+    <Notice text={hasFilter ? '검색 결과가 없습니다.' : emptyText} />
   ) : null;
 }
 
-type KkiruFilterBarProps = {
+type ListFilterBarProps = {
   title: string;
   searchFields: ListOption[];
   statusOptions?: ListOption[];
@@ -336,12 +184,13 @@ type KkiruFilterBarProps = {
   onSearchFieldChange: (value: string) => void;
   onSearchTextChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onStatusChange: (status: string | null) => void;
+  /** 상태 칩을 눌렀을 때. statusOptions가 있을 때만 쓴다. */
+  onStatusChange?: (status: string | null) => void;
   onReset: () => void;
 };
 
-/** 왼쪽 검색 묶음, 오른쪽 상태 칩. 모바일은 두 줄 */
-function KkiruFilterBar({
+/** 왼쪽 검색 묶음, 오른쪽 상태 칩. 모바일은 두 줄. searchFields 앞에 '전체 항목'이 붙는다. */
+export function ListFilterBar({
   title,
   searchFields,
   statusOptions,
@@ -354,7 +203,7 @@ function KkiruFilterBar({
   onSubmit,
   onStatusChange,
   onReset,
-}: KkiruFilterBarProps) {
+}: ListFilterBarProps) {
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
       <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
@@ -410,17 +259,17 @@ function KkiruFilterBar({
       {/* 상태 열이 표 오른쪽 끝에 있으므로 상태 필터도 오른쪽 끝에 둔다. */}
       {statusOptions ? (
         <fieldset aria-label="상태" className="m-0 flex flex-wrap gap-2 border-0 p-0">
-          <KkiruChip onClick={() => onStatusChange(null)} pressed={status === null}>
+          <Chip onClick={() => onStatusChange?.(null)} pressed={status === null}>
             전체
-          </KkiruChip>
+          </Chip>
           {statusOptions.map((option) => (
-            <KkiruChip
+            <Chip
               key={option.value}
-              onClick={() => onStatusChange(option.value)}
+              onClick={() => onStatusChange?.(option.value)}
               pressed={status === option.value}
             >
               {option.label}
-            </KkiruChip>
+            </Chip>
           ))}
         </fieldset>
       ) : null}
@@ -428,12 +277,13 @@ function KkiruFilterBar({
   );
 }
 
-type KkiruListViewProps<T extends { id: string }> = Pick<
+type ListViewProps<T extends { id: string }> = Pick<
   ListTableProps<T>,
   'title' | 'unit' | 'columns' | 'rowLink' | 'emptyText' | 'minWidth' | 'addLink'
 > & {
-  state: LoadState<T>;
-  activeSort: string;
+  state: ListLoadState<T>;
+  /** 정렬 중인 열의 sortField. 없으면 null */
+  activeSort: string | null;
   activeOrder: SortOrder;
   hasFilter: boolean;
   listQuery: string;
@@ -441,10 +291,16 @@ type KkiruListViewProps<T extends { id: string }> = Pick<
   onSort: (column: ListColumn<T>) => void;
   onRetry: () => void;
   onPage: (page: number) => void;
+  /** 지금 한 페이지 개수(주소 값) */
+  pageSize: number;
+  /** 개수를 바꿨을 때. 1페이지로 돌아간다 */
+  onPageSize: (size: number) => void;
+  /** 열 폭을 머리글 className으로 고정한다 (긴 글은 칸 안에서 말줄임) */
+  fixedLayout?: boolean;
 };
 
-/** 끼루 모양 목록: 제목 줄 → 필터 바 → 표 카드 → 페이지 */
-function KkiruListView<T extends { id: string }>({
+/** 목록: 제목 줄 → 필터 바 → 표 카드 → 페이지 (docs/design/goodplace-style-guide.md '표'·'필터 바') */
+export function ListView<T extends { id: string }>({
   title,
   unit,
   columns,
@@ -461,12 +317,15 @@ function KkiruListView<T extends { id: string }>({
   onSort,
   onRetry,
   onPage,
-}: KkiruListViewProps<T>) {
+  pageSize,
+  onPageSize,
+  fixedLayout = false,
+}: ListViewProps<T>) {
   const pagination = state.kind === 'loaded' ? state.data.pagination : null;
 
   return (
     <section>
-      <KkiruPageHead
+      <PageHead
         controlsClassName="flex items-center gap-2"
         count={pagination ? `${pagination.total.toLocaleString()}${unit}` : null}
         title={title}
@@ -477,21 +336,28 @@ function KkiruListView<T extends { id: string }>({
             {addLink.label}
           </Link>
         ) : null}
-      </KkiruPageHead>
+      </PageHead>
 
       {filterBar}
 
       {/* 표는 카드 안에서만 가로로 밀린다. */}
       <div className="overflow-x-auto rounded-[18px] bg-[var(--surface)]">
-        <table className="w-full text-left text-sm" style={{ minWidth }}>
+        <table
+          className={`w-full text-left text-sm ${fixedLayout ? 'table-fixed' : ''}`}
+          style={{ minWidth }}
+        >
           <thead className="border-b border-[var(--line)]/60 text-[var(--muted)]">
             <tr>
               {columns.map((column) => (
-                <KkiruColumnHeader
+                <ColumnHeader
                   column={column}
                   key={column.key}
                   onSort={onSort}
-                  order={column.sortField === activeSort ? activeOrder : null}
+                  order={
+                    column.sortField !== undefined && column.sortField === activeSort
+                      ? activeOrder
+                      : null
+                  }
                 />
               ))}
             </tr>
@@ -499,7 +365,7 @@ function KkiruListView<T extends { id: string }>({
           <tbody>
             {state.kind === 'loaded'
               ? state.data.items.map((item) => (
-                  <KkiruListRow
+                  <ListRow
                     columns={columns}
                     item={item}
                     key={item.id}
@@ -509,7 +375,7 @@ function KkiruListView<T extends { id: string }>({
               : null}
           </tbody>
         </table>
-        <KkiruTableMessage
+        <TableMessage
           emptyText={emptyText}
           hasFilter={hasFilter}
           onRetry={onRetry}
@@ -522,9 +388,11 @@ function KkiruListView<T extends { id: string }>({
         <div className="mt-4">
           <Pagination
             label={`${title} 페이지`}
-            look="kkiru"
             onChange={onPage}
+            onPageSizeChange={onPageSize}
             page={pagination.page}
+            pageSize={pageSize}
+            total={pagination.total}
             totalPages={pagination.totalPages}
           />
         </div>
@@ -533,7 +401,7 @@ function KkiruListView<T extends { id: string }>({
   );
 }
 
-function parsePage(value: string | null): number {
+function parsePageNumber(value: string | null): number {
   const page = Number.parseInt(value ?? '', 10);
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
@@ -564,8 +432,9 @@ function parseListQuery<T>(
         searchFields.map((option) => option.value),
       ) ?? 'all',
     order: sort ? order : null,
-    page: parsePage(params.get('page')),
+    page: parsePageNumber(params.get('page')),
     q: (params.get('q') ?? '').trim().slice(0, 100),
+    size: parsePageSize(params.get('size')),
     sort: order ? sort : null,
     status: pickAllowed(
       params.get('status'),
@@ -587,7 +456,6 @@ export function ListTable<T extends { id: string }>({
   emptyText,
   minWidth,
   addLink,
-  look = 'default',
 }: ListTableProps<T>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -597,7 +465,7 @@ export function ListTable<T extends { id: string }>({
   const [searchText, setSearchText] = useState(query.q);
   const [searchField, setSearchField] = useState(query.field);
   const [reloadKey, setReloadKey] = useState(0);
-  const [state, setState] = useState<LoadState<T>>({ kind: 'loading' });
+  const [state, setState] = useState<ListLoadState<T>>({ kind: 'loading' });
 
   useEffect(() => {
     setSearchText(query.q);
@@ -650,165 +518,44 @@ export function ListTable<T extends { id: string }>({
 
   const activeSort = query.sort ?? defaultSort.field;
   const activeOrder = query.order ?? defaultSort.order;
-  const pagination = state.kind === 'loaded' ? state.data.pagination : null;
   const hasFilter = Boolean(query.q || query.status);
   const retry = () => setReloadKey((key) => key + 1);
 
-  if (look === 'kkiru') {
-    return (
-      <KkiruListView
-        activeOrder={activeOrder}
-        activeSort={activeSort}
-        addLink={addLink}
-        columns={columns}
-        emptyText={emptyText}
-        filterBar={
-          <KkiruFilterBar
-            hasFilter={hasFilter}
-            onReset={() => updateQuery({ field: 'all', page: 1, q: '', status: null })}
-            onSearchFieldChange={setSearchField}
-            onSearchTextChange={setSearchText}
-            onStatusChange={(status) => updateQuery({ page: 1, status })}
-            onSubmit={handleSearch}
-            searchField={searchField}
-            searchFields={searchFields}
-            searchText={searchText}
-            status={query.status}
-            statusOptions={statusOptions}
-            title={title}
-          />
-        }
-        hasFilter={hasFilter}
-        listQuery={queryKey ? `?${queryKey}` : ''}
-        minWidth={minWidth}
-        onPage={(nextPage) => updateQuery({ page: nextPage })}
-        onRetry={retry}
-        onSort={handleSort}
-        rowLink={rowLink}
-        state={state}
-        title={title}
-        unit={unit}
-      />
-    );
-  }
-
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          {pagination ? (
-            <p className="text-sm text-[var(--muted)]">
-              {pagination.total.toLocaleString()}
-              {unit}
-            </p>
-          ) : null}
-        </div>
-        {addLink ? (
-          <Link
-            className="flex h-10 items-center gap-1.5 bg-[var(--brand)] px-4 text-sm font-semibold text-white hover:bg-[var(--brand-hover)]"
-            href={addLink.href}
-          >
-            <Icon className="size-4" name="plus" />
-            {addLink.label}
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <form
-          aria-label={`${title} 검색`}
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
-          onSubmit={handleSearch}
-        >
-          <SelectBox
-            className="w-36"
-            label="검색 항목"
-            onChange={setSearchField}
-            options={[{ label: '전체 항목', value: 'all' }, ...searchFields]}
-            value={searchField}
-          />
-          <input
-            aria-label="검색어"
-            className={`${CONTROL_CLASS_NAME} min-w-0 flex-1 sm:max-w-80`}
-            maxLength={100}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="검색어 입력"
-            type="search"
-            value={searchText}
-          />
-          <button className={BUTTON_CLASS_NAME} type="submit">
-            검색
-          </button>
-          {hasFilter ? (
-            <button
-              className="h-10 px-2 text-sm text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
-              onClick={() => updateQuery({ field: 'all', page: 1, q: '', status: null })}
-              type="button"
-            >
-              검색 초기화
-            </button>
-          ) : null}
-        </form>
-        {/* 상태 열이 표 오른쪽 끝에 있으므로 상태 필터도 오른쪽 끝에 둔다. */}
-        {statusOptions ? (
-          <div className="ml-auto">
-            <SelectBox
-              className="w-32"
-              label="상태 필터"
-              onChange={(value) => updateQuery({ page: 1, status: value || null })}
-              options={[{ label: '전체 상태', value: '' }, ...statusOptions]}
-              value={query.status ?? ''}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-        {/* 열 너비를 고정하지 않고 내용에 맞춰 남는 폭을 고루 나눈다. */}
-        <table className="w-full text-left text-sm" style={{ minWidth }}>
-          <thead className="border-b border-[var(--line)] bg-[var(--background)] text-[var(--muted)]">
-            <tr>
-              {columns.map((column) => (
-                <ColumnHeader
-                  column={column}
-                  key={column.key}
-                  onSort={handleSort}
-                  order={column.sortField === activeSort ? activeOrder : null}
-                />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {state.kind === 'loaded'
-              ? state.data.items.map((item) => (
-                  <ListRow
-                    columns={columns}
-                    item={item}
-                    key={item.id}
-                    link={rowLink(item, queryKey ? `?${queryKey}` : '')}
-                  />
-                ))
-              : null}
-          </tbody>
-        </table>
-        <TableMessage
-          emptyText={emptyText}
+    <ListView
+      activeOrder={activeOrder}
+      activeSort={activeSort}
+      addLink={addLink}
+      columns={columns}
+      emptyText={emptyText}
+      filterBar={
+        <ListFilterBar
           hasFilter={hasFilter}
-          onRetry={retry}
-          state={state}
+          onReset={() => updateQuery({ field: 'all', page: 1, q: '', status: null })}
+          onSearchFieldChange={setSearchField}
+          onSearchTextChange={setSearchText}
+          onStatusChange={(status) => updateQuery({ page: 1, status })}
+          onSubmit={handleSearch}
+          searchField={searchField}
+          searchFields={searchFields}
+          searchText={searchText}
+          status={query.status}
+          statusOptions={statusOptions}
           title={title}
         />
-      </div>
-
-      {pagination ? (
-        <Pagination
-          label={`${title} 페이지`}
-          onChange={(nextPage) => updateQuery({ page: nextPage })}
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-        />
-      ) : null}
-    </section>
+      }
+      hasFilter={hasFilter}
+      listQuery={queryKey ? `?${queryKey}` : ''}
+      minWidth={minWidth}
+      onPage={(nextPage) => updateQuery({ page: nextPage })}
+      onPageSize={(size) => updateQuery({ page: 1, size })}
+      onRetry={retry}
+      onSort={handleSort}
+      pageSize={query.size}
+      rowLink={rowLink}
+      state={state}
+      title={title}
+      unit={unit}
+    />
   );
 }

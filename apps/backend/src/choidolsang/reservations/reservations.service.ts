@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE, type Pagination, toPagination } from '../../common/page-size';
 import {
   type ChoidolsangBabyGender,
   type ChoidolsangConcept,
@@ -25,8 +26,6 @@ import {
   type ReservationSortOrder,
   type UpdateReservationDto,
 } from './dto/create-reservation.dto';
-
-export const RESERVATION_PAGE_SIZE = 20;
 
 /** 예약을 만들 수 있는 문의 상태. 예약확정·취소된 문의는 이미 예약이 있다. */
 const RESERVABLE_INQUIRY_STATUSES = new Set(['pending', 'rejected']);
@@ -80,7 +79,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ReservationListResponse = {
   items: Reservation[];
-  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+  pagination: Pagination;
 };
 
 type ReservationWithRelations = ChoidolsangReservation & {
@@ -210,6 +209,7 @@ export class ChoidolsangReservationsService {
     field = 'all',
     order = 'desc',
     page = 1,
+    size = DEFAULT_PAGE_SIZE,
     q = '',
     sort = 'eventAt',
     status,
@@ -221,20 +221,15 @@ export class ChoidolsangReservationsService {
         include: RESERVATION_INCLUDE,
         // 기본은 행사 날짜가 늦은 것부터. 같은 값끼리는 행사가 늦은 것, 최근 예약 순.
         orderBy: [RESERVATION_ORDER_BY[sort](order), { eventAt: 'desc' }, { createdAt: 'desc' }],
-        skip: (page - 1) * RESERVATION_PAGE_SIZE,
-        take: RESERVATION_PAGE_SIZE,
+        skip: (page - 1) * size,
+        take: size,
         where,
       }),
     ]);
 
     return {
       items: reservations.map(toReservation),
-      pagination: {
-        page,
-        pageSize: RESERVATION_PAGE_SIZE,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / RESERVATION_PAGE_SIZE)),
-      },
+      pagination: toPagination(page, size, total),
     };
   }
 

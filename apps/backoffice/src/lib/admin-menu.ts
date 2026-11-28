@@ -17,13 +17,13 @@ export const ADMIN_MENUS: Record<AdminService, AdminMenuItem[]> = {
     { href: '/choidolsang/marketing', icon: 'megaphone', label: '마케팅' },
     { href: '/choidolsang/sales', icon: 'chart-bar', label: '매출' },
   ],
-  kkiru: [
-    { href: '/kkiru/schedule', icon: 'calendar', label: '일정' },
-    { href: '/kkiru/listings', icon: 'home', label: '매물' },
-    { href: '/kkiru/meetings', icon: 'handshake', label: '미팅' },
-    { href: '/kkiru/contracts', icon: 'file-text', label: '계약' },
-    { href: '/kkiru/customers', icon: 'users', label: '고객' },
-    { href: '/kkiru/ads', icon: 'megaphone', label: '광고' },
-    { href: '/kkiru/income', icon: 'wallet', label: '수입' },
+  goodplace: [
+    { href: '/goodplace/schedule', icon: 'calendar', label: '일정' },
+    { href: '/goodplace/listings', icon: 'home', label: '매물' },
+    { href: '/goodplace/meetings', icon: 'handshake', label: '미팅' },
+    { href: '/goodplace/contracts', icon: 'file-text', label: '계약' },
+    { href: '/goodplace/customers', icon: 'users', label: '고객' },
+    { href: '/goodplace/ads', icon: 'megaphone', label: '광고' },
+    { href: '/goodplace/income', icon: 'wallet', label: '수입' },
   ],
 };

@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { PAGE_SIZES, type PageSize } from '../../../common/page-size';
 
 export const CONCEPT_NAME_MAX_LENGTH = 100;
 /** 구성품 항목 수와 항목 하나의 길이 */
@@ -69,6 +70,12 @@ export class ListConceptsQueryDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  /** 한 페이지 개수. 10·20·50·100 중 하나, 없으면 20 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn(PAGE_SIZES)
+  size?: PageSize;
 
   /** 검색어 (부분 일치) */
   @IsOptional()

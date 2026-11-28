@@ -1,12 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { CopyCodeButton } from '@/components/copy-code-button';
-import { Icon } from '@/components/icon';
 import { InquiryStatusBadge } from '@/components/inquiry-status-badge';
-import { Pagination } from '@/components/pagination';
+import {
+  type ListColumn,
+  ListFilterBar,
+  type ListLoadState,
+  ListView,
+} from '@/components/list-table';
 import {
   formatInquiryDate,
   formatSeoulDateTime,
@@ -15,8 +18,8 @@ import {
   INQUIRY_SEARCH_FIELDS,
   INQUIRY_STATUS_LABELS,
   INQUIRY_STATUSES,
+  type Inquiry,
   type InquiryListQuery,
-  type InquiryListResponse,
   type InquirySearchField,
   type InquirySortField,
   type InquiryStatus,
@@ -24,13 +27,7 @@ import {
   parseInquiryListQuery,
   toInquiryListSearchParams,
 } from '@/lib/choidolsang-inquiries-api';
-
-const EMPTY_VALUE = <span className="text-[var(--muted)]">-</span>;
-
-const CONTROL_CLASS_NAME =
-  'h-10 border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)]';
-const BUTTON_CLASS_NAME =
-  'h-10 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50';
+import { EMPTY_VALUE } from '@/lib/ui';
 
 // 처음 누르면 날짜는 최신순, 글자는 가나다순으로 정렬한다.
 const DEFAULT_SORT_ORDERS: Record<InquirySortField, 'asc' | 'desc'> = {
@@ -41,106 +38,92 @@ const DEFAULT_SORT_ORDERS: Record<InquirySortField, 'asc' | 'desc'> = {
   status: 'asc',
 };
 
-type Column = {
-  key: string;
-  label: string;
-  sortField?: InquirySortField;
-  className?: string;
-};
-
-const COLUMNS: Column[] = [
-  // 문의 번호는 순서가 없는 무작위 코드라 정렬하지 않는다.
-  { className: 'w-36', key: 'code', label: '문의 번호' },
-  { className: 'w-28', key: 'inquiredOn', label: '문의 날짜', sortField: 'inquiredOn' },
-  { key: 'content', label: '문의 내용' },
+const COLUMNS: ListColumn<Inquiry>[] = [
+  // 문의 번호는 순서가 없는 무작위 코드라 정렬하지 않는다. 첫 열은 rowLink가 그린다.
+  { className: 'w-40', key: 'code', label: '문의 번호', render: () => null },
   {
-    className: 'w-40',
+    className: 'w-28',
+    key: 'inquiredOn',
+    label: '문의 날짜',
+    render: (inquiry) => (
+      <span className="whitespace-nowrap tabular-nums">
+        {formatInquiryDate(inquiry.inquiredOn)}
+      </span>
+    ),
+    sortField: 'inquiredOn',
+  },
+  {
+    key: 'content',
+    label: '문의 내용',
+    render: (inquiry) => (
+      <p className="truncate" title={inquiry.content}>
+        {getFirstLine(inquiry.content)}
+      </p>
+    ),
+  },
+  {
+    className: 'w-44',
     key: 'desiredReservationAt',
     label: '희망 예약일시',
+    render: (inquiry) => (
+      <span className="whitespace-nowrap tabular-nums">
+        {inquiry.desiredReservationAt
+          ? formatSeoulDateTime(inquiry.desiredReservationAt)
+          : EMPTY_VALUE}
+      </span>
+    ),
     sortField: 'desiredReservationAt',
   },
-  { className: 'w-32', key: 'location', label: '장소', sortField: 'location' },
   {
-    className: 'w-36',
+    className: 'w-32',
+    key: 'location',
+    label: '장소',
+    render: (inquiry) =>
+      inquiry.location ? (
+        <p className="truncate" title={inquiry.location}>
+          {inquiry.location}
+        </p>
+      ) : (
+        EMPTY_VALUE
+      ),
+    sortField: 'location',
+  },
+  {
+    className: 'w-40',
     key: 'desiredConcept',
     label: '희망 돌상 컨셉',
+    render: (inquiry) =>
+      inquiry.desiredConcept ? (
+        <p className="truncate" title={inquiry.desiredConcept.name}>
+          {inquiry.desiredConcept.name}
+          {inquiry.desiredConcept.isDeleted ? (
+            <span className="text-[var(--muted)]"> (삭제됨)</span>
+          ) : null}
+        </p>
+      ) : (
+        EMPTY_VALUE
+      ),
     sortField: 'desiredConcept',
   },
-  { className: 'w-24', key: 'status', label: '상태', sortField: 'status' },
+  {
+    className: 'w-28',
+    key: 'status',
+    label: '상태',
+    render: (inquiry) => <InquiryStatusBadge status={inquiry.status} />,
+    sortField: 'status',
+  },
 ];
 
-const SORT_ICONS = { asc: 'arrow-up', desc: 'arrow-down' } as const;
-const ARIA_SORT = { asc: 'ascending', desc: 'descending' } as const;
+// '전체 항목'은 필터 바가 맨 앞에 붙인다.
+const SEARCH_OPTIONS = INQUIRY_SEARCH_FIELDS.filter((field) => field !== 'all').map((field) => ({
+  label: INQUIRY_SEARCH_FIELD_LABELS[field],
+  value: field,
+}));
 
-type ColumnHeaderProps = {
-  column: Column;
-  /** 이 열로 정렬 중이면 정렬 방향, 아니면 null */
-  order: 'asc' | 'desc' | null;
-  onSort: (sortField: InquirySortField) => void;
-};
-
-function ColumnHeader({ column, order, onSort }: ColumnHeaderProps) {
-  const { sortField } = column;
-
-  return (
-    <th
-      aria-sort={order ? ARIA_SORT[order] : undefined}
-      className={`px-4 py-3 font-medium whitespace-nowrap ${column.className ?? ''}`}
-      scope="col"
-    >
-      {sortField ? (
-        <button
-          className="flex items-center gap-1 hover:text-[var(--foreground)]"
-          onClick={() => onSort(sortField)}
-          type="button"
-        >
-          {column.label}
-          <Icon
-            className={`size-3.5 ${order ? 'text-[var(--brand)]' : 'opacity-50'}`}
-            name={order ? SORT_ICONS[order] : 'chevrons-up-down'}
-          />
-        </button>
-      ) : (
-        column.label
-      )}
-    </th>
-  );
-}
-
-function StatusFilter({
-  value,
-  onChange,
-}: {
-  value: InquiryStatus | '';
-  onChange: (status: InquiryStatus | '') => void;
-}) {
-  return (
-    <div className="relative">
-      <select
-        aria-label="상태 필터"
-        className={`${CONTROL_CLASS_NAME} w-32 appearance-none pr-9`}
-        onChange={(event) => onChange(event.target.value as InquiryStatus | '')}
-        value={value}
-      >
-        <option value="">전체 상태</option>
-        {INQUIRY_STATUSES.map((status) => (
-          <option key={status} value={status}>
-            {INQUIRY_STATUS_LABELS[status]}
-          </option>
-        ))}
-      </select>
-      <Icon
-        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-        name="chevron-down"
-      />
-    </div>
-  );
-}
-
-type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; data: InquiryListResponse };
+const STATUS_OPTIONS = INQUIRY_STATUSES.map((status) => ({
+  label: INQUIRY_STATUS_LABELS[status],
+  value: status,
+}));
 
 export function ChoidolsangInquiryTable() {
   const router = useRouter();
@@ -154,7 +137,7 @@ export function ChoidolsangInquiryTable() {
   const [searchField, setSearchField] = useState<InquirySearchField>(query.field);
   const [searchText, setSearchText] = useState(query.q);
   const [reloadKey, setReloadKey] = useState(0);
-  const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  const [state, setState] = useState<ListLoadState<Inquiry>>({ kind: 'loading' });
 
   // 뒤로 가기 등으로 URL이 바뀌면 검색창도 맞춘다.
   useEffect(() => {
@@ -206,192 +189,52 @@ export function ChoidolsangInquiryTable() {
     updateQuery({ order, page: 1, sort: sortField });
   }
 
-  const pagination = state.kind === 'loaded' ? state.data.pagination : null;
   const detailQuery = queryKey ? `?${queryKey}` : '';
+  const hasFilter = Boolean(query.q || query.status);
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-lg font-semibold">문의 기록</h2>
-          {pagination ? (
-            <p className="text-sm text-[var(--muted)]">{pagination.total.toLocaleString()}건</p>
-          ) : null}
-        </div>
-        <Link
-          className="flex h-10 items-center gap-1.5 bg-[var(--brand)] px-4 text-sm font-semibold text-white hover:bg-[var(--brand-hover)]"
-          href={`/choidolsang/inquiries/new${detailQuery}`}
-        >
-          <Icon className="size-4" name="plus" />
-          문의 추가
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <form
-          aria-label="문의 검색"
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+    <ListView
+      activeOrder={query.order}
+      activeSort={query.sort}
+      addLink={{ href: `/choidolsang/inquiries/new${detailQuery}`, label: '문의 추가' }}
+      columns={COLUMNS}
+      emptyText="아직 등록된 문의가 없습니다."
+      filterBar={
+        <ListFilterBar
+          hasFilter={hasFilter}
+          onReset={() => updateQuery({ field: 'all', page: 1, q: '', status: '' })}
+          onSearchFieldChange={(field) => setSearchField(field as InquirySearchField)}
+          onSearchTextChange={setSearchText}
+          onStatusChange={(status) =>
+            updateQuery({ page: 1, status: (status ?? '') as InquiryStatus | '' })
+          }
           onSubmit={handleSearch}
-        >
-          <div className="relative">
-            <select
-              aria-label="검색 항목"
-              className={`${CONTROL_CLASS_NAME} w-40 appearance-none pr-9`}
-              onChange={(event) => setSearchField(event.target.value as InquirySearchField)}
-              value={searchField}
-            >
-              {INQUIRY_SEARCH_FIELDS.map((field) => (
-                <option key={field} value={field}>
-                  {INQUIRY_SEARCH_FIELD_LABELS[field]}
-                </option>
-              ))}
-            </select>
-            <Icon
-              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-              name="chevron-down"
-            />
-          </div>
-          <input
-            aria-label="검색어"
-            className={`${CONTROL_CLASS_NAME} min-w-0 flex-1 sm:max-w-80`}
-            maxLength={100}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="검색어 입력"
-            type="search"
-            value={searchText}
-          />
-          <button className={BUTTON_CLASS_NAME} type="submit">
-            검색
-          </button>
-          {query.q || query.status ? (
-            <button
-              className="h-10 px-2 text-sm text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
-              onClick={() => updateQuery({ field: 'all', page: 1, q: '', status: '' })}
-              type="button"
-            >
-              검색 초기화
-            </button>
-          ) : null}
-        </form>
-        {/* 상태 열이 표 오른쪽 끝에 있으므로 상태 필터도 오른쪽 끝에 둔다. */}
-        <div className="ml-auto">
-          <StatusFilter
-            onChange={(status) => updateQuery({ page: 1, status })}
-            value={query.status}
-          />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full min-w-[56rem] table-fixed text-left text-sm">
-          <thead className="border-b border-[var(--line)] bg-[var(--background)] text-[var(--muted)]">
-            <tr>
-              {COLUMNS.map((column) => (
-                <ColumnHeader
-                  column={column}
-                  key={column.key}
-                  onSort={handleSort}
-                  order={column.sortField === query.sort ? query.order : null}
-                />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {state.kind === 'loaded'
-              ? state.data.items.map((inquiry) => (
-                  // 행 전체를 누르면 상세로 간다. 문의 번호 링크를 행 크기로 늘려서
-                  // 키보드 이동, 새 탭 열기 같은 링크 동작을 그대로 쓴다.
-                  <tr
-                    className="relative cursor-pointer border-b border-[var(--line)] last:border-b-0 hover:bg-[var(--background)] has-[a:focus-visible]:bg-[var(--brand-soft)]"
-                    key={inquiry.id}
-                  >
-                    <td className="px-4 py-3">
-                      <span className="flex items-center gap-1">
-                        <Link
-                          aria-label={`문의 ${inquiry.code} 상세 보기`}
-                          className="font-mono text-[13px] tracking-wide outline-none after:absolute after:inset-0"
-                          href={`/choidolsang/inquiries/${inquiry.code}${detailQuery}`}
-                        >
-                          {inquiry.code}
-                        </Link>
-                        <CopyCodeButton code={inquiry.code} label="문의 번호" />
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap tabular-nums">
-                      {formatInquiryDate(inquiry.inquiredOn)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="truncate" title={inquiry.content}>
-                        {getFirstLine(inquiry.content)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap tabular-nums">
-                      {inquiry.desiredReservationAt
-                        ? formatSeoulDateTime(inquiry.desiredReservationAt)
-                        : EMPTY_VALUE}
-                    </td>
-                    <td className="px-4 py-3">
-                      {inquiry.location ? (
-                        <p className="truncate" title={inquiry.location}>
-                          {inquiry.location}
-                        </p>
-                      ) : (
-                        EMPTY_VALUE
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {inquiry.desiredConcept ? (
-                        <p className="truncate" title={inquiry.desiredConcept.name}>
-                          {inquiry.desiredConcept.name}
-                          {inquiry.desiredConcept.isDeleted ? (
-                            <span className="text-[var(--muted)]"> (삭제됨)</span>
-                          ) : null}
-                        </p>
-                      ) : (
-                        EMPTY_VALUE
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <InquiryStatusBadge status={inquiry.status} />
-                    </td>
-                  </tr>
-                ))
-              : null}
-          </tbody>
-        </table>
-
-        {state.kind === 'loading' ? (
-          <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-            문의를 불러오고 있습니다.
-          </p>
-        ) : null}
-        {state.kind === 'error' ? (
-          <div className="flex flex-col items-center gap-3 px-4 py-10" role="alert">
-            <p className="text-sm text-[var(--error)]">문의를 불러오지 못했습니다.</p>
-            <button
-              className={BUTTON_CLASS_NAME}
-              onClick={() => setReloadKey((key) => key + 1)}
-              type="button"
-            >
-              다시 시도
-            </button>
-          </div>
-        ) : null}
-        {state.kind === 'loaded' && state.data.items.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-            {query.q || query.status ? '검색 결과가 없습니다.' : '아직 등록된 문의가 없습니다.'}
-          </p>
-        ) : null}
-      </div>
-
-      {pagination ? (
-        <Pagination
-          label="문의 기록 페이지"
-          onChange={(page) => updateQuery({ page })}
-          page={pagination.page}
-          totalPages={pagination.totalPages}
+          searchField={searchField}
+          searchFields={SEARCH_OPTIONS}
+          searchText={searchText}
+          status={query.status || null}
+          statusOptions={STATUS_OPTIONS}
+          title="문의"
         />
-      ) : null}
-    </section>
+      }
+      fixedLayout
+      hasFilter={hasFilter}
+      listQuery={detailQuery}
+      minWidth="60rem"
+      onPage={(page) => updateQuery({ page })}
+      onPageSize={(size) => updateQuery({ page: 1, size })}
+      onRetry={() => setReloadKey((key) => key + 1)}
+      onSort={(column) => handleSort(column.sortField as InquirySortField)}
+      pageSize={query.size}
+      rowLink={(inquiry, listQuery) => ({
+        extra: <CopyCodeButton code={inquiry.code} label="문의 번호" />,
+        href: `/choidolsang/inquiries/${inquiry.code}${listQuery}`,
+        label: `문의 ${inquiry.code} 상세 보기`,
+        text: inquiry.code,
+      })}
+      state={state}
+      title="문의 기록"
+      unit="건"
+    />
   );
 }

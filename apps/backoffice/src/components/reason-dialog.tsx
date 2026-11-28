@@ -8,7 +8,7 @@ import {
   INPUT_TEXTAREA_CLASS_NAME,
   PRIMARY_BUTTON_CLASS_NAME,
   SECONDARY_BUTTON_CLASS_NAME,
-} from '@/lib/kkiru-ui';
+} from '@/lib/ui';
 
 type ReasonDialogProps = {
   title: string;
@@ -21,7 +21,7 @@ type ReasonDialogProps = {
 };
 
 // 사유를 꼭 적어야 하는 상태 변경(미팅중단·재개, 계약취소)을 확인하는 모달.
-// 현재 끼루 전용. 끼루 모달 모양(docs/design/kkiru-style-guide.md '모달')이다.
+// 공통 모달 모양(docs/design/goodplace-style-guide.md '모달')이다.
 export function ReasonDialog({
   title,
   label,
@@ -81,7 +81,7 @@ export function ReasonDialog({
   return (
     <dialog
       aria-labelledby={titleId}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-[0_12px_40px_rgba(16,24,40,0.16)] backdrop:bg-black/40"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-(--shadow-pop) backdrop:bg-[var(--backdrop)]"
       onCancel={(event) => {
         if (isSubmitting) {
           event.preventDefault();

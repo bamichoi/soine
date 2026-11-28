@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
+import { DataLoader } from '@/components/data-loader';
+import { FormField } from '@/components/form-field';
 import { StringListInput } from '@/components/string-list-input';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
@@ -13,47 +15,21 @@ import {
   type Concept,
   type ConceptInput,
   createConcept,
+  getConcept,
   updateConcept,
 } from '@/lib/choidolsang-concepts-api';
 import { toAmountText } from '@/lib/money';
 import { toStringListItems, toStringListValues } from '@/lib/string-list';
-import { type ConceptLoadState, useConcept } from '@/lib/use-concept';
+import {
+  ERROR_BOX_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_UNIT_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 const LIST_PATH = '/choidolsang/concepts';
-
-const CONTROL_CLASS_NAME =
-  'w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
-
-function Field({
-  label,
-  htmlFor,
-  required = false,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  required?: boolean;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-[10rem_1fr] sm:gap-4">
-      <label className="pt-2 text-sm font-medium" htmlFor={htmlFor}>
-        {label}
-        {required ? (
-          <span aria-hidden="true" className="ml-0.5 text-[var(--error)]">
-            *
-          </span>
-        ) : null}
-      </label>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {children}
-        {hint ? <p className="text-xs text-[var(--muted)]">{hint}</p> : null}
-      </div>
-    </div>
-  );
-}
 
 function buildInput(name: string, components: string[], priceText: string): ConceptInput | string {
   if (!name.trim()) {
@@ -124,15 +100,15 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
   return (
     <form
       aria-label={concept ? '돌상 컨셉 수정' : '돌상 컨셉 추가'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-5" disabled={isSubmitting}>
         <legend className="sr-only">돌상 컨셉 정보</legend>
 
-        <Field htmlFor={id('name')} label="이름" required>
+        <FormField htmlFor={id('name')} label="이름" required>
           <input
-            className={`${CONTROL_CLASS_NAME} h-10`}
+            className={INPUT_CLASS_NAME}
             id={id('name')}
             maxLength={CONCEPT_NAME_MAX_LENGTH}
             onChange={(event) => setName(event.target.value)}
@@ -140,9 +116,9 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
             required
             value={name}
           />
-        </Field>
+        </FormField>
 
-        <Field
+        <FormField
           hint={`입력하고 추가를 누르거나 Enter를 치면 목록에 더해집니다. (${components.length} / ${CONCEPT_COMPONENTS_MAX_COUNT}개)`}
           htmlFor={id('components')}
           label="구성품"
@@ -156,12 +132,12 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
             onChange={setComponents}
             placeholder="예: 상차림 테이블"
           />
-        </Field>
+        </FormField>
 
-        <Field htmlFor={id('price')} label="가격" required>
+        <FormField htmlFor={id('price')} label="가격" required>
           <div className="relative sm:w-56">
             <input
-              className={`${CONTROL_CLASS_NAME} h-10 pr-9 text-right tabular-nums`}
+              className={`${INPUT_CLASS_NAME} pr-10 text-right tabular-nums`}
               id={id('price')}
               inputMode="numeric"
               onChange={(event) => setPriceText(toAmountText(event.target.value))}
@@ -169,31 +145,22 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
               required
               value={priceText}
             />
-            <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-[var(--muted)]">
-              원
-            </span>
+            <span className={INPUT_UNIT_CLASS_NAME}>원</span>
           </div>
-        </Field>
+        </FormField>
       </fieldset>
 
-      <footer className="mt-6 flex flex-col gap-3">
+      <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
-          >
+          <Link className={SECONDARY_BUTTON_CLASS_NAME} href={cancelHref}>
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -202,33 +169,10 @@ export function ChoidolsangConceptForm({ concept }: ChoidolsangConceptFormProps)
   );
 }
 
-/** 불러오는 중·없음·오류 안내. 불러왔으면 null */
-export function ConceptLoadMessage({ state }: { state: ConceptLoadState }) {
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">돌상 컨셉을 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 돌상 컨셉을 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        돌상 컨셉을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  return null;
-}
-
 export function ChoidolsangConceptEditForm({ id }: { id: string }) {
-  const state = useConcept(id);
-
-  return state.kind === 'loaded' ? (
-    <ChoidolsangConceptForm concept={state.concept} />
-  ) : (
-    <ConceptLoadMessage state={state} />
+  return (
+    <DataLoader load={getConcept} loadKey={id} noun="돌상 컨셉">
+      {(concept) => <ChoidolsangConceptForm concept={concept} />}
+    </DataLoader>
   );
 }

@@ -1,4 +1,5 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
+import { DEFAULT_PAGE_SIZE, parsePageSize } from '@/lib/list-query';
 
 export const CONCEPT_NAME_MAX_LENGTH = 100;
 /** 구성품 항목 수와 항목 하나의 길이 */
@@ -47,6 +48,8 @@ export type ConceptSortField = (typeof CONCEPT_SORT_FIELDS)[number];
 
 export type ConceptListQuery = {
   page: number;
+  /** 한 페이지 개수. 기본 20 */
+  size: number;
   q: string;
   field: ConceptSearchField;
   sort: ConceptSortField;
@@ -78,6 +81,7 @@ export function parseConceptListQuery(params: URLSearchParams): ConceptListQuery
     order: hasSort ? (order as 'asc' | 'desc') : DEFAULT_SORT.order,
     page: Number.isInteger(page) && page > 0 ? page : 1,
     q: (params.get('q') ?? '').trim().slice(0, 100),
+    size: parsePageSize(params.get('size')),
     sort: hasSort ? (sort as ConceptSortField) : DEFAULT_SORT.sort,
   };
 }
@@ -101,6 +105,10 @@ export function toConceptListSearchParams(query: ConceptListQuery): URLSearchPar
 
   if (query.page > 1) {
     params.set('page', String(query.page));
+  }
+
+  if (query.size !== DEFAULT_PAGE_SIZE) {
+    params.set('size', String(query.size));
   }
 
   return params;

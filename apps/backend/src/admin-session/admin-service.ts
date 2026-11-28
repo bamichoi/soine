@@ -1,7 +1,7 @@
 import { NotFoundException, type PipeTransform } from '@nestjs/common';
 
-/// 백오피스 서비스. 값은 PostgreSQL 스키마 이름, 백오피스 경로(/choidolsang, /kkiru)와 같다.
-export const ADMIN_SERVICES = ['choidolsang', 'kkiru'] as const;
+/// 백오피스 서비스. 값은 PostgreSQL 스키마 이름, 백오피스 경로(/choidolsang, /goodplace)와 같다.
+export const ADMIN_SERVICES = ['choidolsang', 'goodplace'] as const;
 
 export type AdminService = (typeof ADMIN_SERVICES)[number];
 
