@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>끼루 스타일 통일 시안 - 미팅 상세</title>
+<style>
+  /* apps/backoffice/src/app/globals.css 토큰과 같은 값 */
+  :root {
+    --background: #f4f6f9; --surface: #ffffff; --foreground: #1d2433; --muted: #667085; --line: #d9dee6;
+    --brand: #094ea3; --brand-hover: #0b5cc0; --brand-strong: #073b7b; --brand-soft: #e6eef8;
+    --error: #b42318; --error-soft: #fef3f2; --success: #067647; --success-soft: #ecfdf3;
+    --warning: #b54708; --warning-soft: #fffaeb;
+    --faint: rgb(102 112 133 / 0.7);          /* text-[var(--muted)]/70 */
+    --line-60: rgb(217 222 230 / 0.6);        /* border-[var(--line)]/60 */
+    --line-40: rgb(217 222 230 / 0.4);
+    --bg-60: rgb(244 246 249 / 0.6);          /* bg-[var(--background)]/60 */
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9ecf0; color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, p { margin: 0; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
+  a { color: inherit; text-decoration: none; }
+  a, button, select, label, [role="button"] { cursor: pointer; }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.i.s16 { width: 16px; height: 16px; } svg.i.s14 { width: 14px; height: 14px; }
+
+  /* ---------- 시안 전용: 상태 바꿔 보기 (앱에는 없음) ---------- */
+  .mock-bar { width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+    font-size: 13px; color: var(--muted); }
+  .mock-bar b { color: var(--foreground); }
+  .mock-bar label { display: inline-flex; align-items: center; gap: 6px; }
+  body:has(#v-real:checked) .v-meeting { display: none !important; }
+  body:has(#v-meeting:checked) .v-real { display: none !important; }
+
+  /* ---------- 앱 틀: admin-shell.tsx 지금 모양 그대로 ---------- */
+  .shell { width: 1280px; min-height: 900px; margin: 0 auto; background: var(--background); }
+  .top { position: sticky; top: 0; z-index: 5; height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .crumb { display: flex; align-items: center; gap: 6px; }
+  .crumb a { font-size: 18px; font-weight: 600; color: var(--brand); }
+  .crumb svg { color: var(--muted); }
+  .crumb span { font-size: 14px; font-weight: 500; }
+  .top-right { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .top-right button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; color: var(--muted); }
+  .top-right button:hover { background: var(--background); color: var(--foreground); }
+  .frame { display: flex; }
+  .side { width: 240px; flex: none; min-height: 844px; background: var(--surface); border-right: 1px solid var(--line); padding: 12px; }
+  .side ul { display: flex; flex-direction: column; gap: 4px; }
+  .side a { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .side a:hover { background: var(--background); color: var(--foreground); }
+  .side a[aria-current="page"] { background: var(--brand-soft); color: var(--brand); }
+  main { flex: 1; min-width: 0; padding: 32px; }
+
+  /* ---------- 끼루 공통 (kkiru-style-guide.md) ---------- */
+  .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 8px 0 20px; }
+  .head h2 { font-size: 26px; line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
+  .badge { display: inline-flex; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .t-active { background: var(--brand-soft); color: var(--brand); }
+  .t-done { background: var(--success-soft); color: var(--success); }
+  .t-negative { background: var(--error-soft); color: var(--error); }
+  .icon-btn { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
+  .icon-btn:hover { background: var(--background); color: var(--foreground); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .btn.sub { background: var(--surface); }
+  .btn.sub:hover { background: rgb(255 255 255 / .7); }
+  .btn.danger { color: var(--error); }
+  .btn.main { background: var(--brand); color: #fff; font-weight: 700; padding: 0 20px; }
+  .btn.main:hover { background: var(--brand-hover); }
+  .btn.sm { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+  .btn.brand-soft { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .btn.brand-soft:hover { background: var(--brand); color: #fff; }
+  .card { border-radius: 18px; background: var(--surface); }
+
+  /* ---------- 상세 ---------- */
+  .detail { max-width: 896px; }
+  .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+  .meta .mono { font-size: 13px; color: var(--foreground); letter-spacing: .02em; }
+  .actions { display: flex; gap: 8px; }
+
+  /* 정보 시트: 묶음 제목(왼쪽 고정 폭) + 4열 정의 목록. 모든 칸 같은 글자 크기. */
+  .sheet { padding: 4px 28px; }
+  .grp { display: grid; grid-template-columns: 88px 1fr; gap: 24px; padding: 18px 0; border-top: 1px solid var(--line-60); }
+  .grp:first-child { border-top: 0; }
+  .grp h3 { padding-top: 1px; font-size: 14px; font-weight: 700; }
+  .grp dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 24px; margin: 0; }
+  .grp dt { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .grp dd { margin: 3px 0 0; font-size: 15px; font-weight: 600; word-break: keep-all; }
+  .grp dd small { display: block; color: var(--faint); font-size: 12px; font-weight: 500; }
+  .grp dd.money { font-weight: 700; }
+  .grp dd a { color: var(--brand); }
+  .grp dd a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* 묶음 머리 */
+  .group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 12px; }
+  .group-head h3 { font-size: 19px; font-weight: 800; }
+  .group-head h3 em { font-style: normal; color: var(--brand); margin-left: 6px; }
+
+  /* 상세 안 하위 목록: 카드 하나 + 열 머리 + 줄 (행마다 떠 있는 카드 아님) */
+  .list { padding: 0 8px; }
+  .list-head, .item { display: grid; align-items: center; gap: 16px; }
+  .listings .list-head, .listings .item { grid-template-columns: minmax(0, 1fr) 84px 104px 136px; }
+  .contracts .list-head, .contracts .item { grid-template-columns: minmax(0, 1fr) 120px 104px 24px; }
+  .list-head { height: 44px; padding: 0 14px; border-bottom: 1px solid var(--line-60); font-size: 12px; font-weight: 600; color: var(--muted); }
+  .item { position: relative; min-height: 68px; padding: 12px 14px; border-bottom: 1px solid var(--line-40); border-radius: 12px; }
+  .item:last-child { border-bottom: 0; }
+  .item:hover { background: var(--bg-60); }
+  .item .stretch { position: absolute; inset: 0; border-radius: 12px; }   /* 줄 전체 링크 */
+  .item .stretch:focus-visible { outline-offset: -2px; }
+  .item .t { display: flex; align-items: baseline; gap: 8px; font-size: 15px; font-weight: 700; min-width: 0; }
+  .item .t span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .t .mono { font-size: 12px; font-weight: 500; color: var(--faint); }
+  .item .s { margin-top: 2px; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .dash { color: var(--faint); }
+  .item .tools { position: relative; z-index: 1; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
+  .item .date { font-size: 14px; font-weight: 600; }
+  .item .go { color: var(--faint); }
+  .menu-btn { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--muted); }
+  .menu-btn:hover { background: var(--background); color: var(--foreground); }
+  .menu-gap { width: 32px; height: 32px; }
+
+  /* 로그 */
+  .log { padding: 4px 24px; }
+  .log li { display: grid; grid-template-columns: 92px 1fr auto; gap: 16px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--line-60); }
+  .log li:last-child { border-bottom: 0; }
+  .log .date { font-size: 13px; color: var(--faint); }
+  .log .text { font-size: 15px; line-height: 1.7; }
+  .log .ref { display: inline-flex; margin-right: 6px; border-radius: 6px; padding: 1px 6px; background: var(--background); color: var(--muted); font-size: 12px; font-weight: 600; vertical-align: 1px; }
+  .log .edit { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .log .edit:hover { color: var(--foreground); }
+
+  .note { margin-top: 32px; padding: 14px 18px; border-radius: 14px; background: var(--surface); color: var(--muted); font-size: 13px; line-height: 1.8; }
+  .note b { color: var(--foreground); }
+  .note ul { list-style: disc; padding-left: 18px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/></symbol>
+  <symbol id="handshake" viewBox="0 0 24 24"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7 .9l.2.2a2 2 0 0 0 1.4.6H21"/><path d="m21 3 1 11h-2M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></symbol>
+  <symbol id="file-text" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="megaphone" viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1Z"/><path d="M17 9a4 4 0 0 1 0 6M7 15l1.5 5h2.5l-1-5"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+</svg>
+
+<!-- 시안 전용 상태 전환. 데이터는 로컬 DB 미팅 7WF1SS22 그대로, '미팅중일 때'는 버튼 위치만 보여 주는 가정 -->
+<form class="mock-bar" aria-label="시안 상태">
+  <b>시안 상태</b>
+  <label><input type="radio" name="v" id="v-real" checked /> 실제 데이터 (계약완료)</label>
+  <label><input type="radio" name="v" id="v-meeting" /> 미팅중일 때 (계약 진행·미팅 중단 보이기)</label>
+</form>
+
+<div class="shell">
+  <header class="top">
+    <nav aria-label="현재 위치"><ol class="crumb"><li><a href="#">끼루</a></li><li style="display:flex;align-items:center;gap:6px"><svg class="i s16"><use href="#chevron-right"/></svg><span aria-current="page">미팅</span></li></ol></nav>
+    <div class="top-right"><span>끼루 관리자</span><button type="button"><svg class="i s16"><use href="#logout"/></svg>로그아웃</button></div>
+  </header>
+  <div class="frame">
+    <aside class="side">
+      <nav aria-label="메인 메뉴"><ul>
+        <li><a href="kkiru-style-schedule.html"><svg class="i"><use href="#calendar"/></svg>일정</a></li>
+        <li><a href="#"><svg class="i"><use href="#home"/></svg>매물</a></li>
+        <li><a href="kkiru-style-meeting-detail.html" aria-current="page"><svg class="i"><use href="#handshake"/></svg>미팅</a></li>
+        <li><a href="kkiru-style-contracts.html"><svg class="i"><use href="#file-text"/></svg>계약</a></li>
+        <li><a href="#"><svg class="i"><use href="#users"/></svg>고객</a></li>
+        <li><a href="#"><svg class="i"><use href="#megaphone"/></svg>광고</a></li>
+        <li><a href="#"><svg class="i"><use href="#wallet"/></svg>수입</a></li>
+      </ul></nav>
+    </aside>
+    <main>
+      <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">미팅</h1>
+      <div class="detail">
+
+        <!-- 1. 제목 줄: 케이스 번호·상태 / 미팅 제목, 오른쪽 동작 버튼 -->
+        <div class="head">
+          <div>
+            <p class="meta">
+              케이스 <span class="mono" translate="no">7WF1SS22</span>
+              <button class="icon-btn" type="button" aria-label="케이스 번호 7WF1SS22 복사"><svg class="i s14"><use href="#copy"/></svg></button>
+              <span class="badge t-done v-real">계약완료</span>
+              <span class="badge t-active v-meeting">미팅중</span>
+            </p>
+            <h2>[샘플] 연남동 카페 창업</h2>
+          </div>
+          <div class="actions">
+            <a class="btn sub" href="#">수정</a>
+            <button class="btn sub danger v-meeting" type="button">미팅 중단</button>
+            <a class="btn main v-real" href="#">계약 정보</a>
+            <a class="btn main v-meeting" href="#">계약 진행</a>
+          </div>
+        </div>
+
+        <!-- 2. 정보 시트: 묶음 3개 × 4칸. 큰 숫자·알약 없음. 고객은 여기 한 번만 -->
+        <section class="card sheet" aria-label="미팅 정보">
+          <div class="grp">
+            <h3>고객</h3>
+            <dl>
+              <div><dt>이름</dt><dd><a href="#">[샘플] 김민준</a></dd></div>
+              <div><dt>연락처</dt><dd class="num">010-6001-0001</dd></div>
+              <div><dt>미팅 일시</dt><dd class="num">2026.10.08 14:00</dd></div>
+              <div><dt>유입 경로</dt><dd>네이버부동산</dd></div>
+            </dl>
+          </div>
+          <div class="grp">
+            <h3>찾는 조건</h3>
+            <dl>
+              <div><dt>희망 업종</dt><dd>카페</dd></div>
+              <div><dt>관심 상권</dt><dd>연남동·망원동</dd></div>
+              <div><dt>희망 평수</dt><dd class="num">15~20평<small>약 49.6~66.1㎡</small></dd></div>
+              <div><dt>희망 층수</dt><dd>1층</dd></div>
+            </dl>
+          </div>
+          <div class="grp">
+            <h3>예산</h3>
+            <dl>
+              <div><dt>예산</dt><dd class="money num">8,000만원<small>보증금 + 권리금</small></dd></div>
+              <div><dt>최대 가용 보증금</dt><dd class="money num">3,000만원</dd></div>
+              <div><dt>최대 가용 권리금</dt><dd class="money num">5,000만원</dd></div>
+              <div><dt>희망 임대료</dt><dd class="money num">월 250만원</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <!-- 3. 미팅 매물: 카드 하나 안 줄 목록. 열 = 매물 | 매물 상태 | 이 미팅 계약 | 동작 -->
+        <div class="group-head">
+          <h3>미팅 매물<em class="num">2건</em></h3>
+          <button class="btn sub sm" type="button"><svg class="i s14"><use href="#plus"/></svg>매물 추가</button>
+        </div>
+        <section class="card list listings" aria-label="미팅 매물">
+          <div class="list-head" aria-hidden="true"><span>매물</span><span>매물 상태</span><span>이 미팅 계약</span><span></span></div>
+          <ul>
+            <li class="item">
+              <a class="stretch" href="#" aria-label="매물 [샘플] 연남동 코너 카페 자리 보기"></a>
+              <div style="min-width:0">
+                <p class="t"><span>[샘플] 연남동 코너 카페 자리</span><span class="mono" translate="no">2P773VBB</span></p>
+                <p class="s num">59.5㎡ (18평) · 1층 · 보증금 3,000만원 / 월 220만원 · 권리금 4,000만원</p>
+              </div>
+              <span><span class="badge t-done">계약완료</span></span>
+              <span><span class="badge t-done">계약완료</span></span>
+              <!-- 계약이 걸린 매물은 뺄 수 없어 ⋮ 자리를 비운다 -->
+              <div class="tools"><span class="menu-gap" aria-hidden="true"></span></div>
+            </li>
+            <li class="item">
+              <a class="stretch" href="#" aria-label="매물 [샘플] 망원동 1층 베이커리 보기"></a>
+              <div style="min-width:0">
+                <p class="t"><span>[샘플] 망원동 1층 베이커리</span><span class="mono" translate="no">1AGHZ444</span></p>
+                <p class="s num">46.2㎡ (14평) · 1층 · 보증금 2,000만원 / 월 180만원 · 권리금 3,000만원</p>
+              </div>
+              <span><span class="badge t-active">미팅중</span></span>
+              <span class="dash" aria-label="계약 없음">-</span>
+              <div class="tools">
+                <a class="btn sm brand-soft v-meeting" href="#">계약 진행</a>
+                <button class="menu-btn" type="button" aria-label="미팅 매물 [샘플] 망원동 1층 베이커리 메뉴" aria-haspopup="menu" aria-expanded="false"><svg class="i s16"><use href="#more-vertical"/></svg></button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- 4. 계약: 같은 줄 목록. 열 = 매물 | 계약일 | 상태 | > -->
+        <div class="group-head">
+          <h3>계약<em class="num">1건</em></h3>
+        </div>
+        <section class="card list contracts" aria-label="계약">
+          <div class="list-head" aria-hidden="true"><span>매물</span><span>계약일</span><span>상태</span><span></span></div>
+          <ul>
+            <li class="item">
+              <a class="stretch" href="#" aria-label="[샘플] 연남동 코너 카페 자리 계약 보기"></a>
+              <p class="t"><span>[샘플] 연남동 코너 카페 자리</span><span class="mono" translate="no">2P773VBB</span></p>
+              <span class="date num">2026.10.08</span>
+              <span><span class="badge t-done">계약완료</span></span>
+              <svg class="i s16 go" aria-hidden="true"><use href="#chevron-right"/></svg>
+            </li>
+          </ul>
+        </section>
+
+        <!-- 5. 미팅 내용 로그: 맨 아래. 날짜 열 고정, 매물 이름은 앞 회색 태그로 -->
+        <div class="group-head">
+          <h3>미팅 내용<em class="num">4건</em></h3>
+          <button class="btn sub sm" type="button"><svg class="i s14"><use href="#plus"/></svg>기록 추가</button>
+        </div>
+        <section class="card" aria-label="미팅 내용">
+          <ol class="log">
+            <li><span class="date num">2026.10.02</span><p class="text">[샘플] 연남동 일대 15~20평 1층 카페 자리 문의</p><button class="edit" type="button">수정</button></li>
+            <li><span class="date num">2026.10.02</span><p class="text">[샘플] 권리금 5천 이하로 다시 요청</p><button class="edit" type="button">수정</button></li>
+            <li><span class="date num">2026.10.08</span><p class="text"><span class="ref">[샘플] 연남동 코너 카페 자리</span>미팅 일시 2026-10-08 14:00</p><button class="edit" type="button">수정</button></li>
+            <li><span class="date num">2026.10.08</span><p class="text"><span class="ref">[샘플] 연남동 코너 카페 자리</span>[샘플] 연남동 코너 자리 현장 확인</p><button class="edit" type="button">수정</button></li>
+          </ol>
+        </section>
+
+        <div class="note">
+          <b>시안 메모</b> (데이터: 로컬 DB 미팅 7WF1SS22)
+          <ul>
+            <li>지난 시안의 예산 큰 숫자·알약 카드를 없앴다. 모든 값이 같은 15px, 묶음 제목(고객 / 찾는 조건 / 예산)으로만 나눈다.</li>
+            <li>버튼: 계약완료·계약중이면 [수정][계약 정보], 미팅중·계약취소면 [수정][미팅 중단][계약 진행], 진행중단이면 [수정][미팅 재개]. 위 '시안 상태'로 바꿔 볼 수 있다.</li>
+            <li>매물 줄 '계약 진행'은 미팅이 계약 가능 상태이고 매물이 공실·미팅중일 때만. 계약이 걸린 매물은 ⋮(제거)가 없다. ⋮ 메뉴는 '제거' 하나(확인 창 '미팅 매물 제거').</li>
+            <li>'매물 추가'를 누르면 이 카드 맨 위(열 머리 위)에 매물 검색 줄이 열리고, 오른쪽에 '닫기'. 매물 0건이면 카드 안 가운데 "아직 미팅 매물이 없습니다."</li>
+            <li>계약 0건이면 '계약' 묶음을 통째로 숨긴다. 기록의 관련 매물(선택)은 본문 앞 회색 태그로 보여 준다.</li>
+            <li>모바일: 버튼 줄은 제목 아래. 정보 시트는 묶음 제목이 위로 올라가고 2열. 매물·계약 줄은 열 머리를 숨기고 이름 → 설명 → 배지 두 개 → 버튼 순으로 쌓는다. 연락처 옆 '전화 걸기'는 지금처럼 모바일에만.</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

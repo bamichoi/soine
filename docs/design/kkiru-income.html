@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>끼루 수입 시안 (목록형)</title>
+<style>
+  /* apps/backoffice/src/app/globals.css 토큰과 같은 값 */
+  :root {
+    --background: #f4f6f9;
+    --surface: #ffffff;
+    --foreground: #1d2433;
+    --muted: #667085;
+    --line: #d9dee6;
+    --brand: #094ea3;
+    --brand-hover: #0b5cc0;
+    --brand-strong: #073b7b;
+    --brand-soft: #e6eef8;
+    --error: #b42318;
+    --error-soft: #fef3f2;
+    --success: #067647;
+    --success-soft: #ecfdf3;
+    --warning: #b54708;
+    --warning-soft: #fffaeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #e3e7ed;
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, p { margin: 0; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  a { color: inherit; text-decoration: none; cursor: pointer; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; letter-spacing: .025em; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* 아이콘: 실제 앱처럼 SVG 파일을 마스크로 쓰고 글자색을 따른다 */
+  .icon { display: inline-block; width: 20px; height: 20px; background: currentColor; flex-shrink: 0;
+    -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .i-sm { width: 16px; height: 16px; }
+  .i-xs { width: 14px; height: 14px; }
+  .i-chevron-down { --src: url(../../apps/backoffice/public/icons/chevron-down.svg); }
+  .i-chevron-right { --src: url(../../apps/backoffice/public/icons/chevron-right.svg); }
+  .i-chevrons { --src: url(../../apps/backoffice/public/icons/chevrons-up-down.svg); }
+  .i-arrow-up { --src: url(../../apps/backoffice/public/icons/arrow-up.svg); }
+  .i-copy { --src: url(../../apps/backoffice/public/icons/copy.svg); }
+  .i-logout { --src: url(../../apps/backoffice/public/icons/logout.svg); }
+  .i-menu { --src: url(../../apps/backoffice/public/icons/menu.svg); }
+  .i-calendar { --src: url(../../apps/backoffice/public/icons/calendar.svg); }
+  .i-home { --src: url(../../apps/backoffice/public/icons/home.svg); }
+  .i-handshake { --src: url(../../apps/backoffice/public/icons/handshake.svg); }
+  .i-file { --src: url(../../apps/backoffice/public/icons/file-text.svg); }
+  .i-users { --src: url(../../apps/backoffice/public/icons/users.svg); }
+  .i-megaphone { --src: url(../../apps/backoffice/public/icons/megaphone.svg); }
+  .i-wallet { --src: url(../../apps/backoffice/public/icons/wallet.svg); }
+
+  /* ---------- 보드(시안 바깥) ---------- */
+  .board { padding: 32px; display: flex; flex-direction: column; gap: 48px; }
+  .board-title { font-size: 18px; font-weight: 700; }
+  .board-note { font-size: 13px; color: #475467; line-height: 1.75; max-width: 76rem; margin-top: 6px; }
+  .board-note b { color: var(--foreground); }
+  .cap { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  .cap b { color: var(--foreground); }
+  .frames { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* ---------- 앱 셸 (admin-shell.tsx) ---------- */
+  .frame { background: var(--background); border: 1px solid #c3cad5; box-shadow: 0 2px 10px rgba(16,24,40,.06); }
+  .frame.d { width: 1280px; }
+  .frame.m { width: 375px; }
+  .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border-bottom: 1px solid var(--line); background: var(--surface); padding: 0 20px; }
+  .frame.m .topbar { padding: 0 12px 0 20px; }
+  .crumb { display: flex; align-items: center; gap: 6px; }
+  .crumb .svc { font-size: 18px; font-weight: 600; color: var(--brand); }
+  .crumb .icon { color: var(--muted); }
+  .crumb .cur { font-size: 14px; font-weight: 500; }
+  .topbar-r { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .topbar-r button { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; color: var(--muted); }
+  .icon-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--muted); }
+  .body { display: flex; }
+  .side { width: 240px; flex-shrink: 0; border-right: 1px solid var(--line); background: var(--surface); padding: 12px; min-height: 100%; }
+  .side li a { display: flex; align-items: center; gap: 12px; border-radius: 6px; padding: 8px 12px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .side li + li { margin-top: 4px; }
+  .side li a[aria-current] { background: var(--brand-soft); color: var(--brand); }
+  .main { flex: 1; min-width: 0; padding: 32px; }
+  .frame.m .main { padding: 16px; }
+
+  /* ---------- 화면 (list-table.tsx와 같은 모양) ---------- */
+  .page { display: flex; flex-direction: column; gap: 16px; }
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .title-row h2 { font-size: 18px; font-weight: 600; }
+
+  .bar { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; row-gap: 8px; }
+  .bar-l { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .bar-r { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .sel { position: relative; }
+  .sel select { height: 40px; border: 1px solid var(--line); background: var(--surface); padding: 0 36px 0 12px;
+    font: inherit; font-size: 14px; color: var(--foreground); appearance: none; -webkit-appearance: none; border-radius: 0; outline: none; cursor: pointer; }
+  .sel select:focus { border-color: var(--brand); }
+  .sel .icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .w-unit select { width: 96px; }
+  .w-year select { width: 112px; }
+  .w-month select { width: 88px; }
+  .w-mine select { width: 128px; }
+  .w-state select { width: 128px; }
+  .reset { height: 40px; padding: 0 8px; font-size: 14px; color: var(--muted); text-underline-offset: 2px; }
+  .reset:hover { color: var(--foreground); text-decoration: underline; }
+
+  /* 기간 합계 한 줄 */
+  .sum { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--surface); }
+  .sum > div { padding: 12px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .sum > div + div { border-left: 1px solid var(--line); }
+  .sum dt { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .sum dd { margin: 0; display: inline-flex; align-items: baseline; gap: 6px; }
+  .sum .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sum .c { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sum .none { font-size: 14px; color: var(--muted); }
+  .sw { width: 8px; height: 8px; display: inline-block; }
+  .sw.ok { background: var(--success); }
+  .sw.ex { background: var(--brand); }
+
+  /* 표 */
+  .tbox { border: 1px solid var(--line); background: var(--surface); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+  thead { background: var(--background); color: var(--muted); border-bottom: 1px solid var(--line); }
+  th { padding: 12px 16px; font-weight: 500; white-space: nowrap; }
+  td { padding: 12px 16px; }
+  th.r, td.r { text-align: right; }
+  td.r { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th .sort { display: inline-flex; align-items: center; gap: 4px; color: inherit; }
+  th.r .sort { flex-direction: row-reverse; }
+  th .sort .icon { opacity: .5; }
+  th .sort.on .icon { opacity: 1; color: var(--brand); }
+  th .sort:hover { color: var(--foreground); }
+  tbody tr { position: relative; border-bottom: 1px solid var(--line); cursor: pointer; }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody tr:hover { background: var(--background); }
+  tbody tr.gap { cursor: default; }
+  tbody tr.gap:hover { background: none; }
+  tbody tr.gap td { padding-top: 8px; padding-bottom: 8px; color: var(--muted); font-size: 13px; }
+  .rowlink { white-space: nowrap; outline: none; }
+  .rowlink::after { content: ""; position: absolute; inset: 0; }
+  .code { display: flex; align-items: center; gap: 4px; }
+  .copy { position: relative; z-index: 1; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+  .copy:hover { color: var(--foreground); }
+  .trunc { max-width: 20rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); padding: 0 6px; font-size: 12px; line-height: 20px; color: #475467; white-space: nowrap; }
+  .badge { display: inline-flex; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+  .badge.ok { background: var(--success-soft); color: var(--success); }
+  .badge.ex { background: var(--brand-soft); color: var(--brand); }
+  .blank { color: transparent; }
+  .muted { color: var(--muted); }
+
+  .msg { padding: 40px 16px; text-align: center; font-size: 14px; color: var(--muted); }
+  .msg.err { color: var(--error); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .btn { height: 40px; border: 1px solid var(--line); background: var(--surface); padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--foreground); }
+
+  /* 모바일 */
+  .frame.m .bar-l, .frame.m .bar-r { width: 100%; margin-left: 0; }
+  .frame.m .bar-l .sel, .frame.m .bar-r .sel { flex: 1; }
+  .frame.m .sel select { width: 100%; }
+  .frame.m .sum > div { padding: 10px 12px; flex-direction: column; gap: 2px; }
+  .frame.m .sum dd { flex-direction: column; gap: 0; }
+  .frame.m th, .frame.m td { padding: 10px 8px; }
+  .frame.m th:first-child, .frame.m td:first-child { padding-left: 12px; }
+  .frame.m th:last-child, .frame.m td:last-child { padding-right: 12px; }
+  .m-stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .m-stack .sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+  .m-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .unit-note { font-size: 12px; color: var(--muted); text-align: right; margin-bottom: -8px; }
+
+  .states { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; width: 1280px; }
+  .state-card { background: var(--background); border: 1px solid #c3cad5; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <section>
+    <h1 class="board-title">끼루 수입 — 목록형 시안</h1>
+    <p class="board-note">
+      계약 목록과 같은 틀(제목 줄 → 필터 바 → 표)에 <b>기간 합계 한 줄</b>만 더했다.
+      필터 바 왼쪽은 검색 대신 <b>기간(월별·연간, 연, 월)</b>, 오른쪽 끝은 <b>구분(내 매물·내 손님)</b>과 <b>상태(확정·예정)</b>.
+      월별은 그 달 계약 표, 연간은 한 행이 한 달인 월별 표이고 행을 누르면 그 달 월별로 내려간다. 차트는 두지 않는다.
+      샘플: 로컬 DB(오늘 2026-11-28), 매물·고객 이름의 "[샘플]" 접두는 시안에서 뺐다.
+    </p>
+  </section>
+
+  <!-- ===================== 데스크톱: 월별 (기본) ===================== -->
+  <section>
+    <p class="cap"><b>D1. 데스크톱 1280 · 월별(기본, 주소 /kkiru/income)</b> — 2026년 11월. 예정수입이 없으면 0 대신 "없음".</p>
+    <div class="frame d">
+      <header class="topbar">
+        <nav class="crumb" aria-label="현재 위치"><span class="svc">끼루</span><span class="icon i-sm i-chevron-right"></span><span class="cur" aria-current="page">수입</span></nav>
+        <div class="topbar-r"><span>관리자</span><button type="button"><span class="icon i-sm i-logout"></span>로그아웃</button></div>
+      </header>
+      <div class="body">
+        <aside class="side">
+          <ul>
+            <li><a><span class="icon i-calendar"></span>일정</a></li>
+            <li><a><span class="icon i-home"></span>매물</a></li>
+            <li><a><span class="icon i-handshake"></span>미팅</a></li>
+            <li><a><span class="icon i-file"></span>계약</a></li>
+            <li><a><span class="icon i-users"></span>고객</a></li>
+            <li><a><span class="icon i-megaphone"></span>광고</a></li>
+            <li><a aria-current="page"><span class="icon i-wallet"></span>수입</a></li>
+          </ul>
+        </aside>
+        <main class="main">
+          <div class="page">
+            <div class="title-row"><h2>수입</h2></div>
+
+            <div class="bar">
+              <div class="bar-l" role="group" aria-label="기간">
+                <div class="sel w-unit"><select aria-label="기간 단위"><option selected>월별</option><option>연간</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <div class="sel w-year"><select aria-label="연도"><option>2025년</option><option selected>2026년</option><option>2027년</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <div class="sel w-month"><select aria-label="월"><option>10월</option><option selected>11월</option><option>12월</option></select><span class="icon i-sm i-chevron-down"></span></div>
+              </div>
+              <div class="bar-r">
+                <div class="sel w-mine"><select aria-label="구분 필터"><option selected>전체 계약</option><option>내 매물</option><option>내 손님</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <div class="sel w-state"><select aria-label="상태 필터"><option selected>전체 상태</option><option>확정</option><option>예정</option></select><span class="icon i-sm i-chevron-down"></span></div>
+              </div>
+            </div>
+
+            <dl class="sum" aria-label="2026년 11월 합계">
+              <div><dt><span class="sw ok" aria-hidden="true"></span>확정수입</dt><dd><span class="v">730만원</span><span class="c">2건</span></dd></div>
+              <div><dt><span class="sw ex" aria-hidden="true"></span>예정수입</dt><dd><span class="none">없음</span></dd></div>
+              <div><dt>합계</dt><dd><span class="v">730만원</span><span class="c">2건</span></dd></div>
+            </dl>
+
+            <div class="tbox">
+              <table>
+                <thead><tr>
+                  <th>케이스 번호</th>
+                  <th aria-sort="ascending"><button class="sort on" type="button">잔금일<span class="icon i-xs i-arrow-up"></span></button></th>
+                  <th><button class="sort" type="button">임차인<span class="icon i-xs i-chevrons"></span></button></th>
+                  <th><button class="sort" type="button">대상 매물<span class="icon i-xs i-chevrons"></span></button></th>
+                  <th>구분</th>
+                  <th class="r"><button class="sort" type="button">수수료<span class="icon i-xs i-chevrons"></span></button></th>
+                  <th><button class="sort" type="button">상태<span class="icon i-xs i-chevrons"></span></button></th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td><span class="code"><a class="rowlink mono" aria-label="계약 성수동 편집숍 자리 39 상세 보기">19C04A22</a><button class="copy" type="button" aria-label="케이스 번호 복사"><span class="icon i-xs i-copy"></span></button></span></td>
+                    <td class="num">2026.11.06</td>
+                    <td>임의고객39</td>
+                    <td><p class="trunc">성수동 편집숍 자리 39</p></td>
+                    <td><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></td>
+                    <td class="r">240만원</td>
+                    <td><span class="badge ok">확정</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="code"><a class="rowlink mono" aria-label="계약 연남동 네일숍 자리 24 상세 보기">CC896D47</a><button class="copy" type="button" aria-label="케이스 번호 복사"><span class="icon i-xs i-copy"></span></button></span></td>
+                    <td class="num">2026.11.16</td>
+                    <td>임의고객24</td>
+                    <td><p class="trunc">연남동 네일숍 자리 24</p></td>
+                    <td><span class="chips"><span class="chip">내 손님</span></span></td>
+                    <td class="r">490만원</td>
+                    <td><span class="badge ok">확정</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 데스크톱: 연간 ===================== -->
+  <section>
+    <p class="cap"><b>D2. 데스크톱 1280 · 연간 (?year=2026)</b> — 한 행 = 한 달. 행을 누르면 ?month=2026-05 처럼 그 달 월별로. 계약 없는 달은 한 줄로 접고, 금액이 없는 칸은 비운다. 초기화는 기본(이번 달)에서 벗어났을 때만.</p>
+    <div class="frame d">
+      <header class="topbar">
+        <nav class="crumb" aria-label="현재 위치"><span class="svc">끼루</span><span class="icon i-sm i-chevron-right"></span><span class="cur" aria-current="page">수입</span></nav>
+        <div class="topbar-r"><span>관리자</span><button type="button"><span class="icon i-sm i-logout"></span>로그아웃</button></div>
+      </header>
+      <div class="body">
+        <aside class="side">
+          <ul>
+            <li><a><span class="icon i-calendar"></span>일정</a></li>
+            <li><a><span class="icon i-home"></span>매물</a></li>
+            <li><a><span class="icon i-handshake"></span>미팅</a></li>
+            <li><a><span class="icon i-file"></span>계약</a></li>
+            <li><a><span class="icon i-users"></span>고객</a></li>
+            <li><a><span class="icon i-megaphone"></span>광고</a></li>
+            <li><a aria-current="page"><span class="icon i-wallet"></span>수입</a></li>
+          </ul>
+        </aside>
+        <main class="main">
+          <div class="page">
+            <div class="title-row"><h2>수입</h2></div>
+
+            <div class="bar">
+              <div class="bar-l" role="group" aria-label="기간">
+                <div class="sel w-unit"><select aria-label="기간 단위"><option>월별</option><option selected>연간</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <div class="sel w-year"><select aria-label="연도"><option>2025년</option><option selected>2026년</option><option>2027년</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <button class="reset" type="button">초기화</button>
+              </div>
+              <div class="bar-r">
+                <div class="sel w-mine"><select aria-label="구분 필터"><option selected>전체 계약</option><option>내 매물</option><option>내 손님</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                <div class="sel w-state"><select aria-label="상태 필터"><option selected>전체 상태</option><option>확정</option><option>예정</option></select><span class="icon i-sm i-chevron-down"></span></div>
+              </div>
+            </div>
+
+            <dl class="sum" aria-label="2026년 합계">
+              <div><dt><span class="sw ok" aria-hidden="true"></span>확정수입</dt><dd><span class="v">6,380만원</span><span class="c">19건</span></dd></div>
+              <div><dt><span class="sw ex" aria-hidden="true"></span>예정수입</dt><dd><span class="v">2,526만원</span><span class="c">7건</span></dd></div>
+              <div><dt>합계</dt><dd><span class="v">8,906만원</span><span class="c">26건</span></dd></div>
+            </dl>
+
+            <div class="tbox">
+              <table>
+                <thead><tr>
+                  <th>월</th>
+                  <th class="r">건수</th>
+                  <th class="r">확정수입</th>
+                  <th class="r">예정수입</th>
+                  <th class="r">합계</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td><a class="rowlink" aria-label="2026년 1월 수입 보기">1월</a></td><td class="r">3건</td><td class="r">540만원</td><td class="r">480만원</td><td class="r">1,020만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 2월 수입 보기">2월</a></td><td class="r">1건</td><td class="r">350만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">350만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 3월 수입 보기">3월</a></td><td class="r">1건</td><td class="r">400만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">400만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 4월 수입 보기">4월</a></td><td class="r">1건</td><td class="r">410만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">410만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 5월 수입 보기">5월</a></td><td class="r">5건</td><td class="r">1,990만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">1,990만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 6월 수입 보기">6월</a></td><td class="r">2건</td><td class="r">320만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">320만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 7월 수입 보기">7월</a></td><td class="r">3건</td><td class="r">960만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">960만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 8월 수입 보기">8월</a></td><td class="r">1건</td><td class="r">140만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">140만원</td></tr>
+                  <tr class="gap"><td>9월</td><td colspan="4">계약 없음</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 10월 수입 보기">10월</a></td><td class="r">1건</td><td class="r">540만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">540만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 11월 수입 보기">11월</a></td><td class="r">2건</td><td class="r">730만원</td><td class="r"><span class="sr-only">없음</span></td><td class="r">730만원</td></tr>
+                  <tr><td><a class="rowlink" aria-label="2026년 12월 수입 보기">12월</a></td><td class="r">6건</td><td class="r"><span class="sr-only">없음</span></td><td class="r">2,046만원</td><td class="r">2,046만원</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 상태 ===================== -->
+  <section>
+    <p class="cap"><b>D3. 상태</b> — 제목 줄·필터 바는 그대로 두고 합계 줄과 표 자리만 바뀐다. 문구·간격은 ListTable의 TableMessage와 같다.</p>
+    <div class="states">
+      <div class="state-card">
+        <p class="cap"><b>계약 없는 달</b> (2026년 9월) — 합계 줄을 숨기고 표 안에 한 줄</p>
+        <div class="tbox"><p class="msg">2026년 9월에 잔금일인 계약이 없습니다.</p></div>
+      </div>
+      <div class="state-card">
+        <p class="cap"><b>필터 결과 없음</b> (11월 · 예정) — 합계 줄은 기간·구분 기준이라 그대로 보인다. 필터 바에 "초기화"</p>
+        <dl class="sum" aria-label="2026년 11월 합계">
+          <div><dt><span class="sw ok" aria-hidden="true"></span>확정수입</dt><dd><span class="v">730만원</span><span class="c">2건</span></dd></div>
+          <div><dt><span class="sw ex" aria-hidden="true"></span>예정수입</dt><dd><span class="none">없음</span></dd></div>
+          <div><dt>합계</dt><dd><span class="v">730만원</span><span class="c">2건</span></dd></div>
+        </dl>
+        <div class="tbox"><p class="msg">조건에 맞는 계약이 없습니다.</p></div>
+      </div>
+      <div class="state-card">
+        <p class="cap"><b>불러오는 중</b> — 합계 줄 숨김</p>
+        <div class="tbox"><p class="msg">불러오고 있습니다.</p></div>
+      </div>
+      <div class="state-card">
+        <p class="cap"><b>오류</b> — 합계 줄 숨김, role="alert"</p>
+        <div class="tbox"><div class="msg err" role="alert"><p>수입을 불러오지 못했습니다.</p><button class="btn" type="button">다시 시도</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 모바일 ===================== -->
+  <section>
+    <p class="cap"><b>M. 모바일 375</b> (좌우 16px, 가로 스크롤 없음) — 월별 표는 3열(잔금일 / 임차인·매물·구분 / 수수료·상태)로 접고, 연간 표는 건수를 월 아래로 내리고 단위를 표 위에 한 번만 쓴다.</p>
+    <div class="frames">
+
+      <!-- M1 월별 12월 -->
+      <div>
+        <p class="cap"><b>M1. 월별 · 2026년 12월</b></p>
+        <div class="frame m">
+          <header class="topbar">
+            <nav class="crumb" aria-label="현재 위치"><span class="svc">끼루</span><span class="icon i-sm i-chevron-right"></span><span class="cur" aria-current="page">수입</span></nav>
+            <button class="icon-btn" type="button" aria-label="메뉴 열기"><span class="icon i-menu"></span></button>
+          </header>
+          <main class="main">
+            <div class="page">
+              <div class="title-row"><h2>수입</h2></div>
+              <div class="bar">
+                <div class="bar-l" role="group" aria-label="기간">
+                  <div class="sel"><select aria-label="기간 단위"><option selected>월별</option><option>연간</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                  <div class="sel"><select aria-label="연도"><option selected>2026년</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                  <div class="sel"><select aria-label="월"><option selected>12월</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                </div>
+                <div class="bar-r">
+                  <div class="sel"><select aria-label="구분 필터"><option selected>전체 계약</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                  <div class="sel"><select aria-label="상태 필터"><option selected>전체 상태</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                </div>
+                <button class="reset" type="button">초기화</button>
+              </div>
+
+              <dl class="sum" aria-label="2026년 12월 합계">
+                <div><dt><span class="sw ok" aria-hidden="true"></span>확정수입</dt><dd><span class="none">없음</span></dd></div>
+                <div><dt><span class="sw ex" aria-hidden="true"></span>예정수입</dt><dd><span class="v">2,046만원</span><span class="c">6건</span></dd></div>
+                <div><dt>합계</dt><dd><span class="v">2,046만원</span><span class="c">6건</span></dd></div>
+              </dl>
+
+              <div class="tbox">
+                <table>
+                  <thead><tr>
+                    <th aria-sort="ascending"><button class="sort on" type="button">잔금일<span class="icon i-xs i-arrow-up"></span></button></th>
+                    <th>계약</th>
+                    <th class="r"><button class="sort" type="button">수수료<span class="icon i-xs i-chevrons"></span></button></th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 문래동 창고형 매장 상세 보기">12.01</a></td><td><div class="m-stack"><span>조시우</span><span class="sub">문래동 창고형 매장</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>315만원</span><span class="badge ex">예정</span></div></td></tr>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 송리단길 카페 자리 2 상세 보기">12.01</a></td><td><div class="m-stack"><span>임의고객2</span><span class="sub">송리단길 카페 자리 2</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>330만원</span><span class="badge ex">예정</span></div></td></tr>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 연남동 코너 카페 자리 상세 보기">12.01</a></td><td><div class="m-stack"><span>김민준</span><span class="sub">연남동 코너 카페 자리</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>198만원</span><span class="badge ex">예정</span></div></td></tr>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 성수동 2층 쇼룸 상세 보기">12.01</a></td><td><div class="m-stack"><span>이서연</span><span class="sub">성수동 2층 쇼룸</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>405만원</span><span class="badge ex">예정</span></div></td></tr>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 송리단길 브런치 자리 상세 보기">12.01</a></td><td><div class="m-stack"><span>윤채원</span><span class="sub">송리단길 브런치 자리</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>288만원</span><span class="badge ex">예정</span></div></td></tr>
+                    <tr><td class="num"><a class="rowlink" aria-label="계약 망원동 카페 자리 3 상세 보기">12.29</a></td><td><div class="m-stack"><span>임의고객3</span><span class="sub">망원동 카페 자리 3</span><span class="chips"><span class="chip">내 매물</span><span class="chip">내 손님</span></span></div></td><td class="r"><div class="m-right"><span>510만원</span><span class="badge ex">예정</span></div></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <!-- M2 연간 -->
+      <div>
+        <p class="cap"><b>M2. 연간 · 2026년</b></p>
+        <div class="frame m">
+          <header class="topbar">
+            <nav class="crumb" aria-label="현재 위치"><span class="svc">끼루</span><span class="icon i-sm i-chevron-right"></span><span class="cur" aria-current="page">수입</span></nav>
+            <button class="icon-btn" type="button" aria-label="메뉴 열기"><span class="icon i-menu"></span></button>
+          </header>
+          <main class="main">
+            <div class="page">
+              <div class="title-row"><h2>수입</h2></div>
+              <div class="bar">
+                <div class="bar-l" role="group" aria-label="기간">
+                  <div class="sel"><select aria-label="기간 단위"><option selected>연간</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                  <div class="sel"><select aria-label="연도"><option selected>2026년</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                </div>
+                <div class="bar-r">
+                  <div class="sel"><select aria-label="구분 필터"><option selected>전체 계약</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                  <div class="sel"><select aria-label="상태 필터"><option selected>전체 상태</option></select><span class="icon i-sm i-chevron-down"></span></div>
+                </div>
+                <button class="reset" type="button">초기화</button>
+              </div>
+
+              <dl class="sum" aria-label="2026년 합계">
+                <div><dt><span class="sw ok" aria-hidden="true"></span>확정수입</dt><dd><span class="v">6,380만원</span><span class="c">19건</span></dd></div>
+                <div><dt><span class="sw ex" aria-hidden="true"></span>예정수입</dt><dd><span class="v">2,526만원</span><span class="c">7건</span></dd></div>
+                <div><dt>합계</dt><dd><span class="v">8,906만원</span><span class="c">26건</span></dd></div>
+              </dl>
+
+              <p class="unit-note">단위 만원</p>
+              <div class="tbox">
+                <table>
+                  <thead><tr><th>월</th><th class="r">확정</th><th class="r">예정</th><th class="r">합계</th></tr></thead>
+                  <tbody>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 1월 수입 보기">1월</a><span class="sub">3건</span></div></td><td class="r">540</td><td class="r">480</td><td class="r">1,020</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 2월 수입 보기">2월</a><span class="sub">1건</span></div></td><td class="r">350</td><td class="r"></td><td class="r">350</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 3월 수입 보기">3월</a><span class="sub">1건</span></div></td><td class="r">400</td><td class="r"></td><td class="r">400</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 4월 수입 보기">4월</a><span class="sub">1건</span></div></td><td class="r">410</td><td class="r"></td><td class="r">410</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 5월 수입 보기">5월</a><span class="sub">5건</span></div></td><td class="r">1,990</td><td class="r"></td><td class="r">1,990</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 6월 수입 보기">6월</a><span class="sub">2건</span></div></td><td class="r">320</td><td class="r"></td><td class="r">320</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 7월 수입 보기">7월</a><span class="sub">3건</span></div></td><td class="r">960</td><td class="r"></td><td class="r">960</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 8월 수입 보기">8월</a><span class="sub">1건</span></div></td><td class="r">140</td><td class="r"></td><td class="r">140</td></tr>
+                    <tr class="gap"><td>9월</td><td colspan="3">계약 없음</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 10월 수입 보기">10월</a><span class="sub">1건</span></div></td><td class="r">540</td><td class="r"></td><td class="r">540</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 11월 수입 보기">11월</a><span class="sub">2건</span></div></td><td class="r">730</td><td class="r"></td><td class="r">730</td></tr>
+                    <tr><td><div class="m-stack"><a class="rowlink" aria-label="2026년 12월 수입 보기">12월</a><span class="sub">6건</span></div></td><td class="r"></td><td class="r">2,046</td><td class="r">2,046</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
