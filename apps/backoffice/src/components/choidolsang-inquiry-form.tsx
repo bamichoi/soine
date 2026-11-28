@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { ConceptSelect } from '@/components/concept-select';
-import { Icon } from '@/components/icon';
+import { DataLoader } from '@/components/data-loader';
+import { FormField } from '@/components/form-field';
 import { AdminApiError } from '@/lib/admin-auth-api';
 import {
   CREATABLE_INQUIRY_STATUSES,
@@ -22,42 +23,17 @@ import {
   type UpdateInquiryInput,
   updateInquiry,
 } from '@/lib/choidolsang-inquiries-api';
+import {
+  chipClassName,
+  ERROR_BOX_CLASS_NAME,
+  HERO_CLASS_NAME,
+  INPUT_CLASS_NAME,
+  INPUT_TEXTAREA_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 const LIST_PATH = '/choidolsang/inquiries';
-
-const CONTROL_CLASS_NAME =
-  'w-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand)] disabled:opacity-60';
-
-function Field({
-  label,
-  htmlFor,
-  required = false,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  required?: boolean;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-[10rem_1fr] sm:gap-4">
-      <label className="pt-2 text-sm font-medium" htmlFor={htmlFor}>
-        {label}
-        {required ? (
-          <span aria-hidden="true" className="ml-0.5 text-[var(--error)]">
-            *
-          </span>
-        ) : null}
-      </label>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {children}
-        {hint ? <p className="text-xs text-[var(--muted)]">{hint}</p> : null}
-      </div>
-    </div>
-  );
-}
 
 // 희망 예약 날짜와 시간은 둘 다 입력하거나 둘 다 비운다. 한국 시간으로 보낸다.
 function toDesiredReservationAt(date: string, time: string): string | null | 'invalid' {
@@ -209,7 +185,7 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
   return (
     <form
       aria-label={isEdit ? '문의 수정' : '문의 추가'}
-      className="border border-[var(--line)] bg-[var(--surface)] px-5 py-5"
+      className={HERO_CLASS_NAME}
       onSubmit={handleSubmit}
     >
       <fieldset className="flex flex-col gap-5" disabled={isSubmitting}>
@@ -218,25 +194,25 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
         {/* 수정할 때 문의 날짜·내용은 상세의 문의 내용 로그에서 기록별로 고친다. */}
         {isEdit ? null : (
           <>
-            <Field htmlFor={id('inquired-on')} label="문의 날짜" required>
+            <FormField htmlFor={id('inquired-on')} label="문의 날짜" required>
               <input
-                className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
+                className={`${INPUT_CLASS_NAME} sm:w-48`}
                 id={id('inquired-on')}
                 onChange={(event) => setInquiredOn(event.target.value)}
                 required
                 type="date"
                 value={inquiredOn}
               />
-            </Field>
+            </FormField>
 
-            <Field
+            <FormField
               hint={`${content.length.toLocaleString()} / ${INQUIRY_CONTENT_MAX_LENGTH.toLocaleString()}자`}
               htmlFor={id('content')}
               label="문의 내용"
               required
             >
               <textarea
-                className={`${CONTROL_CLASS_NAME} min-h-40 resize-y py-2.5 leading-relaxed`}
+                className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-40`}
                 id={id('content')}
                 maxLength={INQUIRY_CONTENT_MAX_LENGTH}
                 onChange={(event) => setContent(event.target.value)}
@@ -244,11 +220,11 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
                 required
                 value={content}
               />
-            </Field>
+            </FormField>
           </>
         )}
 
-        <Field
+        <FormField
           hint="날짜와 시간을 함께 입력해 주세요. 한국 시간 기준입니다."
           htmlFor={id('reservation-date')}
           label="희망 예약일시"
@@ -256,7 +232,7 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
           <div className="flex flex-wrap gap-2">
             <input
               aria-label="희망 예약 날짜"
-              className={`${CONTROL_CLASS_NAME} h-10 sm:w-48`}
+              className={`${INPUT_CLASS_NAME} sm:w-48`}
               id={id('reservation-date')}
               onChange={(event) => setReservationDate(event.target.value)}
               type="date"
@@ -264,66 +240,63 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
             />
             <input
               aria-label="희망 예약 시간"
-              className={`${CONTROL_CLASS_NAME} h-10 sm:w-36`}
+              className={`${INPUT_CLASS_NAME} sm:w-36`}
               onChange={(event) => setReservationTime(event.target.value)}
               step={600}
               type="time"
               value={reservationTime}
             />
           </div>
-        </Field>
+        </FormField>
 
-        <Field htmlFor={id('location')} label="장소">
+        <FormField htmlFor={id('location')} label="장소">
           <input
-            className={`${CONTROL_CLASS_NAME} h-10`}
+            className={INPUT_CLASS_NAME}
             id={id('location')}
             maxLength={INQUIRY_SHORT_TEXT_MAX_LENGTH}
             onChange={(event) => setLocation(event.target.value)}
             value={location}
           />
-        </Field>
+        </FormField>
 
-        <Field htmlFor={id('desired-concept')} label="희망 돌상 컨셉">
+        <FormField htmlFor={id('desired-concept')} label="희망 돌상 컨셉">
           <ConceptSelect
             current={inquiry?.desiredConcept ?? null}
             id={id('desired-concept')}
             onChange={setDesiredConceptId}
             value={desiredConceptId}
           />
-        </Field>
+        </FormField>
 
         {isEdit ? null : (
-          <Field htmlFor={id('status')} label="상태" required>
-            <div className="relative sm:w-48">
-              <select
-                className={`${CONTROL_CLASS_NAME} h-10 appearance-none pr-9`}
-                id={id('status')}
-                onChange={(event) => setStatus(event.target.value as InquiryStatus)}
-                value={status}
-              >
-                {CREATABLE_INQUIRY_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {INQUIRY_STATUS_LABELS[value]}
-                  </option>
-                ))}
-              </select>
-              <Icon
-                className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[var(--muted)]"
-                name="chevron-down"
-              />
-            </div>
-          </Field>
+          <FormField label="상태" required>
+            {/* 여러 개 중 하나를 반드시 고른다 (흰 카드 안 칩). */}
+            <fieldset className="flex flex-wrap gap-2">
+              <legend className="sr-only">상태</legend>
+              {CREATABLE_INQUIRY_STATUSES.map((value) => (
+                <button
+                  aria-pressed={status === value}
+                  className={chipClassName(status === value, 'card')}
+                  key={value}
+                  onClick={() => setStatus(value)}
+                  type="button"
+                >
+                  {INQUIRY_STATUS_LABELS[value]}
+                </button>
+              ))}
+            </fieldset>
+          </FormField>
         )}
 
         {status === 'rejected' ? (
-          <Field
+          <FormField
             hint={`${rejectionReason.length.toLocaleString()} / ${REJECTION_REASON_MAX_LENGTH.toLocaleString()}자`}
             htmlFor={id('rejection-reason')}
             label="거절 사유"
             required
           >
             <textarea
-              className={`${CONTROL_CLASS_NAME} min-h-28 resize-y py-2.5 leading-relaxed`}
+              className={`${INPUT_TEXTAREA_CLASS_NAME} min-h-28`}
               id={id('rejection-reason')}
               maxLength={REJECTION_REASON_MAX_LENGTH}
               onChange={(event) => setRejectionReason(event.target.value)}
@@ -331,28 +304,21 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
               required
               value={rejectionReason}
             />
-          </Field>
+          </FormField>
         ) : null}
       </fieldset>
 
-      <footer className="mt-6 flex flex-col gap-3">
+      <footer className="mt-8 flex flex-col gap-3">
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Link
-            className="flex h-10 items-center border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)]"
-            href={cancelHref}
-          >
+          <Link className={SECONDARY_BUTTON_CLASS_NAME} href={cancelHref}>
             취소
           </Link>
-          <button
-            className="h-10 bg-[var(--brand)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            type="submit"
-          >
+          <button className={PRIMARY_BUTTON_CLASS_NAME} disabled={isSubmitting} type="submit">
             {isSubmitting ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -361,56 +327,11 @@ export function ChoidolsangInquiryForm({ inquiry }: ChoidolsangInquiryFormProps)
   );
 }
 
-type EditLoadState =
-  | { kind: 'loading' }
-  | { kind: 'not-found' }
-  | { kind: 'error' }
-  | { kind: 'loaded'; inquiry: InquiryDetail };
-
 /** 문의를 불러와 수정 폼을 보여 준다. */
 export function ChoidolsangInquiryEditForm({ code }: { code: string }) {
-  const [state, setState] = useState<EditLoadState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let isActive = true;
-    setState({ kind: 'loading' });
-
-    getInquiry(code)
-      .then((inquiry) => {
-        if (isActive) {
-          setState({ inquiry, kind: 'loaded' });
-        }
-      })
-      .catch((error: unknown) => {
-        if (isActive) {
-          setState(
-            error instanceof AdminApiError && error.status === 404
-              ? { kind: 'not-found' }
-              : { kind: 'error' },
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [code]);
-
-  if (state.kind === 'loading') {
-    return <p className="py-10 text-sm text-[var(--muted)]">문의를 불러오고 있습니다.</p>;
-  }
-
-  if (state.kind === 'not-found') {
-    return <p className="py-10 text-sm text-[var(--muted)]">해당 문의를 찾을 수 없습니다.</p>;
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <p className="py-10 text-sm text-[var(--error)]" role="alert">
-        문의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
-    );
-  }
-
-  return <ChoidolsangInquiryForm inquiry={state.inquiry} />;
+  return (
+    <DataLoader load={getInquiry} loadKey={code} noun="문의">
+      {(inquiry) => <ChoidolsangInquiryForm inquiry={inquiry} />}
+    </DataLoader>
+  );
 }

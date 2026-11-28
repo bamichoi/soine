@@ -1,4 +1,5 @@
 import { requestAdminApi } from '@/lib/admin-auth-api';
+import { type ListQuery, withListParams } from '@/lib/list-query';
 
 export const RESERVATION_STATUSES = ['reserved', 'cancelled', 'completed'] as const;
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
@@ -88,10 +89,8 @@ function reservationPath(code: string): string {
   return `${RESERVATIONS_PATH}/${encodeURIComponent(code)}`;
 }
 
-export async function listReservations(page: number): Promise<ReservationListResponse> {
-  const response = await requestAdminApi(
-    page > 1 ? `${RESERVATIONS_PATH}?page=${page}` : RESERVATIONS_PATH,
-  );
+export async function listReservations(query: ListQuery): Promise<ReservationListResponse> {
+  const response = await requestAdminApi(withListParams(RESERVATIONS_PATH, query));
 
   return (await response.json()) as ReservationListResponse;
 }

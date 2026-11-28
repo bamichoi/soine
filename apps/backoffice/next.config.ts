@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   output: 'standalone',
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
+  // 서비스 이름을 끼루에서 굿플레이스로 바꿨다(ADR-0010). 예전 북마크 주소를 새 주소로 넘긴다.
+  redirects() {
+    return Promise.resolve([
+      {
+        destination: '/goodplace/:path*',
+        permanent: true,
+        source: '/kkiru/:path*',
+      },
+    ]);
+  },
   rewrites() {
     return Promise.resolve([
       {

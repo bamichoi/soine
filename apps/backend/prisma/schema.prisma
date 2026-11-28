@@ -5,11 +5,11 @@ generator client {
 }
 
 // 서비스는 PostgreSQL 스키마로 논리적으로 분리한다 (ADR-0003).
-// 초이돌상 테이블은 choidolsang 스키마, 끼루 테이블은 kkiru 스키마에 둔다.
+// 초이돌상 테이블은 choidolsang 스키마, 굿플레이스 테이블은 goodplace 스키마에 둔다.
 // 두 스키마의 테이블은 서로 관계를 맺지 않는다.
 datasource db {
   provider = "postgresql"
-  schemas  = ["choidolsang", "kkiru"]
+  schemas  = ["choidolsang", "goodplace"]
 }
 
 // ─────────────────────────────── choidolsang ───────────────────────────────
@@ -100,10 +100,10 @@ model ChoidolsangInquiryRecord {
   @@schema("choidolsang")
 }
 
-// ────────────────────────────────── kkiru ──────────────────────────────────
+// ────────────────────────────────── goodplace ──────────────────────────────────
 
-/// 끼루 백오피스 관리자 계정.
-model KkiruAdmin {
+/// 굿플레이스 백오피스 관리자 계정.
+model GoodplaceAdmin {
   id                  String    @id @default(uuid()) @db.Uuid
   email               String    @unique @db.VarChar(254)
   name                String    @db.VarChar(100)
@@ -115,18 +115,18 @@ model KkiruAdmin {
   updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
 
   @@map("admins")
-  @@schema("kkiru")
+  @@schema("goodplace")
 }
 
-/// connect-pg-simple이 쓰는 끼루 관리자 세션 테이블.
-model KkiruAdminSession {
+/// connect-pg-simple이 쓰는 굿플레이스 관리자 세션 테이블.
+model GoodplaceAdminSession {
   sid    String   @id @db.VarChar(255)
   sess   Json     @db.Json
   expire DateTime @db.Timestamp(6)
 
   @@index([expire], map: "admin_sessions_expire_idx")
   @@map("admin_sessions")
-  @@schema("kkiru")
+  @@schema("goodplace")
 }
 
 /// 초이돌상 돌상 컨셉. 고객에게 파는 돌상 세트 상품이다.
@@ -221,4 +221,242 @@ model ChoidolsangReservation {
   @@index([conceptId], map: "reservations_concept_id_idx")
   @@map("reservations")
   @@schema("choidolsang")
+}
+
+// ───────────────────────── 굿플레이스 (부동산 중개) ─────────────────────────
+// 고객(임차인) → 미팅(미팅 매물 여러 개) → 계약(미팅 매물 하나). 한 미팅에 계약이 여러 개 생길 수 있다(ADR-0009).
+// 굿플레이스 데이터는 삭제하지 않는다.
+
+/// 굿플레이스 고객(임차인). 연락처로 같은 사람인지 찾는다.
+model GoodplaceCustomer {
+  id        String         @id @default(uuid()) @db.Uuid
+  /// 화면·주소에 쓰는 고객 번호. 8자리 무작위 코드
+  code      String         @unique @db.VarChar(16)
+  name      String         @db.VarChar(100)
+  /// 연락처. 숫자만 저장하며 고객마다 하나뿐이다.
+  phone     String         @unique @db.VarChar(20)
+  /// 고객 메모 (선택)
+  memo      String?        @db.Text
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(3)
+  meetings  GoodplaceMeeting[]
+
+  @@map("customers")
+  @@schema("goodplace")
+}
+
+enum GoodplaceListingStatus {
+  available // 계약가능
+  meeting // 미팅중
+  contracting // 계약중
+  contracted // 계약완료
+
+  @@map("listing_status")
+  @@schema("goodplace")
+}
+
+/// 굿플레이스 매물(임대). 계약완료된 매물이 다시 나오면 새로 등록한다.
+model GoodplaceListing {
+  id             String                @id @default(uuid()) @db.Uuid
+  /// 매물 번호. 8자리 무작위 코드
+  code           String                @unique @db.VarChar(16)
+  name           String                @db.VarChar(100)
+  address        String                @db.VarChar(300)
+  /// 면적(㎡). 화면에서 평으로 함께 보여 준다.
+  areaM2         Decimal               @db.Decimal(10, 2)
+  /// 층수 (예: 1층, 지하1층, 2~3층)
+  floor          String                @db.VarChar(50)
+  /// 임대료(월세, 만원)
+  rent           Int
+  /// 보증금(만원)
+  deposit        Int
+  /// 권리금(만원)
+  premium        Int
+  hasParking     Boolean?
+  restroomCount  Int?
+  /// 특징 (서술)
+  features       String?               @db.Text
+  /// 매물 의뢰인
+  clientName     String                @db.VarChar(100)
+  /// 의뢰인 연락처 (숫자만)
+  clientPhone    String                @db.VarChar(20)
+  /// 걸린 계약·미팅에서 자동으로 정한다 (common/status-sync.ts)
+  status         GoodplaceListingStatus    @default(available)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @db.Timestamptz(3)
+  meetings       GoodplaceMeetingListing[]
+  contracts      GoodplaceContract[]
+  /// 이 매물을 관련 매물로 남긴 미팅 기록
+  meetingRecords GoodplaceMeetingRecord[]
+
+  @@index([createdAt(sort: Desc)], map: "listings_created_at_idx")
+  @@map("listings")
+  @@schema("goodplace")
+}
+
+enum GoodplaceMeetingStatus {
+  meeting // 미팅중
+  contracting // 계약중
+  contracted // 계약완료
+  contract_cancelled // 계약취소
+  stopped // 진행중단
+
+  @@map("meeting_status")
+  @@schema("goodplace")
+}
+
+enum GoodplaceInflowSource {
+  naver_land // 네이버부동산
+  instagram // 인스타그램
+  other // 기타 (직접 입력)
+
+  @@map("inflow_source")
+  @@schema("goodplace")
+}
+
+/// 굿플레이스 미팅. 고객 한 명과 여러 매물을 두고 진행한다. 케이스 번호는 이 미팅의 계약이 함께 쓴다.
+model GoodplaceMeeting {
+  id                 String                @id @default(uuid()) @db.Uuid
+  /// 케이스 번호. 8자리 무작위 코드
+  code               String                @unique @db.VarChar(16)
+  customerId         String                @db.Uuid
+  customer           GoodplaceCustomer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /// 고객 화면의 미팅 목록에 보일 이름
+  title              String                @db.VarChar(100)
+  /// 관심 상권
+  interestArea       String                @db.VarChar(200)
+  /// 희망 업종
+  desiredBusiness    String                @db.VarChar(200)
+  /// 희망 평수 범위(평)
+  desiredPyeongMin   Decimal               @db.Decimal(8, 2)
+  desiredPyeongMax   Decimal               @db.Decimal(8, 2)
+  /// 희망 층수 (예: 1층, 1~2층)
+  desiredFloor       String                @db.VarChar(50)
+  /// 희망 임대료(만원)
+  desiredRent        Int
+  /// 최대 가용 보증금(만원)
+  maxDeposit         Int
+  /// 최대 가용 권리금(만원). 예산 = 보증금 + 권리금 (저장하지 않고 계산)
+  maxPremium         Int
+  inflowSource       GoodplaceInflowSource
+  /// 유입 경로가 기타일 때 직접 입력한 내용
+  inflowSourceDetail String?               @db.VarChar(100)
+  /// 미팅 일시
+  meetAt             DateTime              @db.Timestamptz(3)
+  /// 미팅 중단 시각. 값이 있으면 진행중단이다(계약이 진행 중이면 계약 상태가 앞선다).
+  stoppedAt          DateTime?             @db.Timestamptz(3)
+  /// 계약과 중단 여부로 자동으로 정한다 (common/status-sync.ts)
+  status             GoodplaceMeetingStatus    @default(meeting)
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+  records            GoodplaceMeetingRecord[]
+  listings           GoodplaceMeetingListing[]
+  contracts          GoodplaceContract[]
+
+  @@index([customerId], map: "meetings_customer_id_idx")
+  @@index([meetAt(sort: Desc), createdAt(sort: Desc)], map: "meetings_meet_at_idx")
+  @@map("meetings")
+  @@schema("goodplace")
+}
+
+enum GoodplaceMeetingRecordKind {
+  note // 미팅 내용
+  stopped // 진행중단 사유
+  resumed // 미팅재개 사유
+  contract_cancelled // 계약취소 사유
+
+  @@map("meeting_record_kind")
+  @@schema("goodplace")
+}
+
+/// 미팅 내용 로그. 첫 기록이 첫 미팅이다. 중단·재개·계약취소 사유도 여기에 남는다. 지우지 않는다.
+model GoodplaceMeetingRecord {
+  id         String                 @id @default(uuid()) @db.Uuid
+  meetingId  String                 @db.Uuid
+  meeting    GoodplaceMeeting           @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  kind       GoodplaceMeetingRecordKind @default(note)
+  recordedOn DateTime               @db.Date
+  content    String                 @db.Text
+  /// 관련 매물(선택). 남길 때는 그 미팅의 미팅 매물이어야 한다. 나중에 미팅 매물에서 빠져도
+  /// 기록은 이력이므로 연결을 그대로 둔다.
+  listingId  String?                @db.Uuid
+  listing    GoodplaceListing?          @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  createdAt  DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime               @updatedAt @db.Timestamptz(3)
+
+  @@index([meetingId, recordedOn, createdAt], map: "meeting_records_meeting_id_idx")
+  @@index([listingId], map: "meeting_records_listing_id_idx")
+  @@map("meeting_records")
+  @@schema("goodplace")
+}
+
+/// 미팅 매물: 미팅에서 고객에게 권한 매물
+model GoodplaceMeetingListing {
+  meetingId String       @db.Uuid
+  meeting   GoodplaceMeeting @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  listingId String       @db.Uuid
+  listing   GoodplaceListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@id([meetingId, listingId])
+  @@index([listingId], map: "meeting_listings_listing_id_idx")
+  @@map("meeting_listings")
+  @@schema("goodplace")
+}
+
+enum GoodplaceContractStatus {
+  contracting // 계약중
+  completed // 계약완료
+  cancelled // 계약취소
+
+  @@map("contract_status")
+  @@schema("goodplace")
+}
+
+/// 굿플레이스 계약. 미팅에서 매물 하나를 골라 만든다. 한 미팅에 계약중인 계약은 하나뿐이고,
+/// 계약완료된 계약이 있으면 새 계약을 만들지 않는다(계약 생성 시 검사).
+/// 계약이 취소된 뒤에는 같은 미팅에서 새 계약을 만들 수 있다.
+model GoodplaceContract {
+  id            String              @id @default(uuid()) @db.Uuid
+  meetingId     String              @db.Uuid
+  meeting       GoodplaceMeeting        @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  /// 대상 매물
+  listingId     String              @db.Uuid
+  listing       GoodplaceListing        @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  contractedOn  DateTime            @db.Date
+  /// 임대인 (매물 의뢰인과 같으면 계약 시점 값을 복사)
+  landlordName  String              @db.VarChar(100)
+  landlordPhone String              @db.VarChar(20)
+  /// 실제 계약 금액(만원). 매물 등록 금액과 다를 수 있다.
+  deposit       Int
+  rent          Int
+  premium       Int
+  /// 임대차 기간
+  leaseStartOn  DateTime            @db.Date
+  leaseEndOn    DateTime            @db.Date
+  specialTerms  String?             @db.Text
+  /// 계약금(만원)
+  downPayment   Int
+  /// 잔금(만원). 기본값은 보증금 − 계약금이지만 직접 고칠 수 있다.
+  balance       Int
+  /// 잔금일. 계약 일자와 같거나 뒤다.
+  balanceDueOn  DateTime            @db.Date
+  /// 수수료(만원). 수입 집계에 쓴다.
+  commission    Int
+  isMyListing   Boolean
+  isMyClient    Boolean
+  status        GoodplaceContractStatus @default(contracting)
+  /// 계약취소 사유 (미팅 로그에도 남긴다)
+  cancelReason  String?             @db.Text
+  completedAt   DateTime?           @db.Timestamptz(3)
+  cancelledAt   DateTime?           @db.Timestamptz(3)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([meetingId], map: "contracts_meeting_id_idx")
+  @@index([listingId], map: "contracts_listing_id_idx")
+  @@index([contractedOn(sort: Desc)], map: "contracts_contracted_on_idx")
+  @@index([balanceDueOn], map: "contracts_balance_due_on_idx")
+  @@map("contracts")
+  @@schema("goodplace")
 }

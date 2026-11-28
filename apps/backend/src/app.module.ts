@@ -21,6 +21,7 @@ import { AdminSessionStoreService } from './admin-session/admin-session-store.se
 import { ChoidolsangConceptsModule } from './choidolsang/concepts/concepts.module';
 import { ChoidolsangInquiriesModule } from './choidolsang/inquiries/inquiries.module';
 import { ChoidolsangReservationsModule } from './choidolsang/reservations/reservations.module';
+import { GoodplaceModule } from './goodplace/goodplace.module';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -32,6 +33,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AdminAuthModule,
     ChoidolsangConceptsModule,
     ChoidolsangInquiriesModule,
+    GoodplaceModule,
     ChoidolsangReservationsModule,
   ],
   controllers: [HealthController],

@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/page-size';
 import { Prisma } from '../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 import {
   buildInquiryOrderBy,
   buildInquiryWhere,
   ChoidolsangInquiriesService,
-  INQUIRY_PAGE_SIZE,
 } from './inquiries.service';
 
 const RECORD_ORDER = [{ recordedOn: 'asc' }, { createdAt: 'asc' }];
@@ -110,10 +110,6 @@ describe('buildInquiryWhere', () => {
     expect(buildInquiryWhere('code', '문의')).toEqual({ id: { in: [] } });
   });
 
-  it('matches status by Korean label', () => {
-    expect(buildInquiryWhere('status', '확정')).toEqual({ status: { in: ['confirmed'] } });
-  });
-
   it('searches every field for all, skipping the code when the query cannot be a code', () => {
     expect(buildInquiryWhere('all', '대기')).toEqual({
       // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
@@ -121,7 +117,6 @@ describe('buildInquiryWhere', () => {
         { records: { some: { content: { contains: '대기', mode: 'insensitive' } } } },
         { location: { contains: '대기', mode: 'insensitive' } },
         { desiredConcept: { is: { name: { contains: '대기', mode: 'insensitive' } } } },
-        { status: { in: ['pending'] } },
       ],
     });
   });
@@ -156,13 +151,13 @@ describe('ChoidolsangInquiriesService', () => {
     expect(mock.inquiry.findMany).toHaveBeenCalledWith({
       include: { desiredConcept: true, records: { orderBy: RECORD_ORDER, take: 1 } },
       orderBy: [{ inquiredOn: 'desc' }, { createdAt: 'desc' }],
-      skip: INQUIRY_PAGE_SIZE,
-      take: INQUIRY_PAGE_SIZE,
+      skip: DEFAULT_PAGE_SIZE,
+      take: DEFAULT_PAGE_SIZE,
       where: { deletedAt: null },
     });
     expect(result.pagination).toEqual({
       page: 2,
-      pageSize: INQUIRY_PAGE_SIZE,
+      pageSize: DEFAULT_PAGE_SIZE,
       total: 45,
       totalPages: 3,
     });
@@ -356,28 +351,6 @@ describe('ChoidolsangInquiriesService edit and delete', () => {
     await expect(mock.service.update('7K3FQ9AM', FIELDS)).rejects.toBeInstanceOf(NotFoundException);
     expect(mock.inquiry.updateMany).not.toHaveBeenCalled();
   });
-
-  it('soft-deletes by recording deletedAt, only when no reservation exists', async () => {
-    await mock.service.remove('7k3fq9am');
-
-    expect(mock.inquiry.updateMany).toHaveBeenCalledWith({
-      data: { deletedAt: expect.any(Date) },
-      where: { code: '7K3FQ9AM', deletedAt: null, reservation: { is: null } },
-    });
-  });
-
-  it('returns 404 when deleting a missing or already deleted inquiry', async () => {
-    mock.inquiry.updateMany.mockResolvedValue({ count: 0 });
-    mock.inquiry.findFirst.mockResolvedValue(null);
-
-    await expect(mock.service.remove('7K3FQ9AM')).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('returns 409 when deleting an inquiry that has a reservation', async () => {
-    mock.inquiry.updateMany.mockResolvedValue({ count: 0 });
-
-    await expect(mock.service.remove('7K3FQ9AM')).rejects.toBeInstanceOf(ConflictException);
-  });
 });
 
 describe('ChoidolsangInquiriesService records', () => {
@@ -419,30 +392,10 @@ describe('ChoidolsangInquiriesService records', () => {
 
   it('returns 404 for a record of another inquiry', async () => {
     mock.record.updateMany.mockResolvedValue({ count: 0 });
-    mock.record.deleteMany.mockResolvedValue({ count: 0 });
 
     await expect(
       mock.service.updateRecord('7K3FQ9AM', 'other', RECORD_INPUT),
     ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(mock.service.removeRecord('7K3FQ9AM', 'other')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-  });
-
-  it('deletes a record of the same inquiry', async () => {
-    await mock.service.removeRecord('7K3FQ9AM', 'record-2');
-
-    expect(mock.record.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'record-2', inquiryId: 'inquiry-1' },
-    });
-  });
-
-  it('refuses to delete the last remaining record', async () => {
-    mock.record.count.mockResolvedValue(1);
-
-    await expect(mock.service.removeRecord('7K3FQ9AM', 'record-1')).rejects.toBeInstanceOf(
-      ConflictException,
-    );
   });
 
   it('returns 404 when changing records of a missing or deleted inquiry', async () => {

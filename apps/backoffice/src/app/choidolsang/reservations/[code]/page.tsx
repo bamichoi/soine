@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { BackToListLink } from '@/components/back-to-list-link';
 import { ChoidolsangReservationDetail } from '@/components/choidolsang-reservation-detail';
-import { PageTitleBar } from '@/components/page-title-bar';
 
 type ReservationDetailPageProps = {
   params: Promise<{ code: string }>;
@@ -31,15 +30,14 @@ export default async function ChoidolsangReservationDetailPage({
   }
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:px-8 md:pt-2 md:pb-8">
       <h1 className="sr-only">예약</h1>
       {/* 목록으로 링크가 검색 조건을 읽으므로 Suspense가 필요하다. */}
       <Suspense>
-        <div className="flex max-w-3xl flex-col gap-4">
-          <PageTitleBar
-            actions={<BackToListLink href="/choidolsang/reservations" />}
-            title="예약 상세"
-          />
+        <div className="max-w-4xl">
+          <div className="mb-2 md:hidden">
+            <BackToListLink href="/choidolsang/reservations" />
+          </div>
           <ChoidolsangReservationDetail code={code} />
         </div>
       </Suspense>

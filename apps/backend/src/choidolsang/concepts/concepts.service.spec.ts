@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/page-size';
 import type { PrismaService } from '../../prisma/prisma.service';
-import { ChoidolsangConceptsService, CONCEPT_PAGE_SIZE } from './concepts.service';
+import { ChoidolsangConceptsService } from './concepts.service';
 
 const CONCEPT = {
   components: ['상차림 테이블', '떡 모형', '꽃 장식'],
@@ -25,6 +26,7 @@ describe('ChoidolsangConceptsService', () => {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
     };
     const prisma = {
+      $queryRaw: jest.fn(() => Promise.resolve([{ id: CONCEPT.id }])),
       $transaction: jest.fn(() => Promise.resolve([21, [CONCEPT]])),
       choidolsangConcept: concept,
     } as unknown as PrismaService;
@@ -36,25 +38,56 @@ describe('ChoidolsangConceptsService', () => {
 
     expect(concept.findMany).toHaveBeenCalledWith({
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      skip: CONCEPT_PAGE_SIZE,
-      take: CONCEPT_PAGE_SIZE,
+      skip: DEFAULT_PAGE_SIZE,
+      take: DEFAULT_PAGE_SIZE,
       where: { deletedAt: null },
     });
     expect(result.pagination).toEqual({
       page: 2,
-      pageSize: CONCEPT_PAGE_SIZE,
+      pageSize: DEFAULT_PAGE_SIZE,
       total: 21,
       totalPages: 2,
     });
     expect(result.items[0]).toMatchObject({ name: '한복 클래식', price: 250000 });
   });
 
+  it('uses the requested page size', async () => {
+    const result = await service.list({ page: 2, size: 50 });
+
+    expect(concept.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 50, take: 50 }));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 50, total: 21, totalPages: 1 });
+  });
+
   it('searches by name case-insensitively', async () => {
-    await service.list({ q: '한복' });
+    await service.list({ field: 'name', q: '한복' });
 
     expect(concept.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { deletedAt: null, name: { contains: '한복', mode: 'insensitive' } },
+      }),
+    );
+  });
+
+  it('searches name or components for all fields', async () => {
+    await service.list({ q: '떡' });
+
+    expect(concept.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deletedAt: null,
+          // biome-ignore lint/style/useNamingConvention: Prisma filter operator.
+          OR: [{ name: { contains: '떡', mode: 'insensitive' } }, { id: { in: [CONCEPT.id] } }],
+        },
+      }),
+    );
+  });
+
+  it('sorts by the chosen column, breaking ties by newest', async () => {
+    await service.list({ order: 'asc', sort: 'price' });
+
+    expect(concept.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ price: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
   });

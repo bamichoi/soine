@@ -3,62 +3,39 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { ConceptLoadMessage } from '@/components/choidolsang-concept-form';
+import { DataLoader } from '@/components/data-loader';
 import { DeleteConfirmDialog } from '@/components/delete-confirm-dialog';
-import { deleteConcept, formatPrice } from '@/lib/choidolsang-concepts-api';
-import { useConcept } from '@/lib/use-concept';
+import { InfoGroup, InfoItem, InfoSheet, InfoTextGroup } from '@/components/detail-parts';
+import { PageHead } from '@/components/page-parts';
+import {
+  type Concept,
+  deleteConcept,
+  formatPrice,
+  getConcept,
+} from '@/lib/choidolsang-concepts-api';
+import { DANGER_BUTTON_CLASS_NAME, SECONDARY_BUTTON_CLASS_NAME } from '@/lib/ui';
 
 const LIST_PATH = '/choidolsang/concepts';
 
-const SECONDARY_BUTTON_CLASS_NAME =
-  'flex h-10 items-center border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium hover:bg-[var(--background)]';
+/** 구성품은 한 줄에 하나씩 */
+function toComponentLines(components: string[]): string | null {
+  return components.length > 0 ? components.map((component) => `· ${component}`).join('\n') : null;
+}
 
-export function ChoidolsangConceptDetail({ id }: { id: string }) {
+function ConceptBody({ concept }: { concept: Concept }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const listQuery = searchParams.toString();
   const querySuffix = listQuery ? `?${listQuery}` : '';
-  const state = useConcept(id);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
-  if (state.kind !== 'loaded') {
-    return <ConceptLoadMessage state={state} />;
-  }
-
-  const { concept } = state;
-
   return (
-    <article className="flex flex-col border border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex flex-col gap-6 p-6">
-        <header className="flex flex-wrap items-baseline justify-between gap-3">
-          <h3 className="text-lg font-semibold break-words">{concept.name}</h3>
-          <p className="text-lg font-semibold tabular-nums">{formatPrice(concept.price)}</p>
-        </header>
-
-        <section
-          aria-label="구성품"
-          className="flex flex-col gap-2 bg-[var(--background)] px-5 py-4"
-        >
-          <h4 className="text-xs text-[var(--muted)]">구성품</h4>
-          {concept.components.length > 0 ? (
-            <ul className="flex flex-col gap-1 text-[15px] leading-7">
-              {concept.components.map((component, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: 읽기 전용 목록이라 순서가 바뀌지 않고, 같은 이름이 있을 수 있다.
-                <li className="flex gap-2 break-words" key={`${index}-${component}`}>
-                  <span aria-hidden="true" className="text-[var(--muted)]">
-                    ·
-                  </span>
-                  {component}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[var(--muted)]">적힌 구성품이 없습니다.</p>
-          )}
-        </section>
-      </div>
-
-      <footer className="flex gap-2 border-t border-[var(--line)] px-6 py-4">
+    <article>
+      {/* 컨셉은 번호가 없어 제목 위 줄 없이 이름만 둔다. 버튼은 보조 → 위험 순서. */}
+      <PageHead
+        controlsClassName="flex w-full flex-wrap items-center gap-2 sm:w-auto"
+        title={<span className="break-words">{concept.name}</span>}
+      >
         <Link
           className={SECONDARY_BUTTON_CLASS_NAME}
           href={`${LIST_PATH}/${concept.id}/edit${querySuffix}`}
@@ -66,13 +43,25 @@ export function ChoidolsangConceptDetail({ id }: { id: string }) {
           수정
         </Link>
         <button
-          className={SECONDARY_BUTTON_CLASS_NAME}
+          className={DANGER_BUTTON_CLASS_NAME}
           onClick={() => setIsDeleteOpen(true)}
           type="button"
         >
           삭제
         </button>
-      </footer>
+      </PageHead>
+
+      <InfoSheet label="돌상 컨셉 정보">
+        <InfoGroup title="가격">
+          <InfoItem isMoney label="가격">
+            {formatPrice(concept.price)}
+          </InfoItem>
+          <InfoItem label="구성품 수">
+            <span className="tabular-nums">{concept.components.length}개</span>
+          </InfoItem>
+        </InfoGroup>
+        <InfoTextGroup text={toComponentLines(concept.components)} title="구성품" />
+      </InfoSheet>
 
       <DeleteConfirmDialog
         isOpen={isDeleteOpen}
@@ -86,5 +75,13 @@ export function ChoidolsangConceptDetail({ id }: { id: string }) {
         title="돌상 컨셉 삭제"
       />
     </article>
+  );
+}
+
+export function ChoidolsangConceptDetail({ id }: { id: string }) {
+  return (
+    <DataLoader load={getConcept} loadKey={id} noun="돌상 컨셉">
+      {(concept) => <ConceptBody concept={concept} />}
+    </DataLoader>
   );
 }

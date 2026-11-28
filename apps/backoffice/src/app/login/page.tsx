@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AdminLoginForm } from '@/components/admin-login-form';
+import { ThemeMenu } from '@/components/theme-menu';
 import { isAdminService } from '@/lib/admin-auth-api';
 
 export const metadata: Metadata = {
@@ -16,7 +17,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <section className="w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
+      <div className="fixed top-4 right-4">
+        <ThemeMenu size="md" />
+      </div>
+      <section className="w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--surface)] p-8 shadow-(--shadow-xs)">
         <header className="mb-6">
           <h1 className="text-2xl font-semibold">관리자 로그인</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">

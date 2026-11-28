@@ -42,7 +42,7 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// 서비스별 계정은 각자의 스키마(choidolsang.admins, kkiru.admins)에 있고 서로 공유하지 않는다.
+// 서비스별 계정은 각자의 스키마(choidolsang.admins, goodplace.admins)에 있고 서로 공유하지 않는다.
 @Injectable()
 export class AdminAuthService {
   // 없는 이메일도 해시 검증 시간을 맞춰 계정 존재 여부가 응답 시간으로 드러나지 않게 한다.
@@ -110,7 +110,7 @@ export class AdminAuthService {
   ): Promise<AdminRecord | null> {
     return service === 'choidolsang'
       ? this.prisma.choidolsangAdmin.findUnique({ where })
-      : this.prisma.kkiruAdmin.findUnique({ where });
+      : this.prisma.goodplaceAdmin.findUnique({ where });
   }
 
   private updateAdmin(
@@ -122,7 +122,7 @@ export class AdminAuthService {
 
     return service === 'choidolsang'
       ? this.prisma.choidolsangAdmin.update({ data, select, where: { id } })
-      : this.prisma.kkiruAdmin.update({ data, select, where: { id } });
+      : this.prisma.goodplaceAdmin.update({ data, select, where: { id } });
   }
 
   private getDummyHash(): Promise<string> {

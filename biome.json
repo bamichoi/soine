@@ -16,7 +16,8 @@
       "!**/.turbo",
       "!**/.vercel",
       "!**/*.generated.*",
-      "!**/pnpm-lock.yaml"
+      "!**/pnpm-lock.yaml",
+      "!docs/design"
     ]
   },
   "formatter": {

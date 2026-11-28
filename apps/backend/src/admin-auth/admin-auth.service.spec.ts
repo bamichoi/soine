@@ -23,7 +23,7 @@ describe('AdminAuthService', () => {
   let passwordHash: string;
   let admin: AdminRecord;
   let choidolsang: { findUnique: jest.Mock; update: jest.Mock };
-  let kkiru: { findUnique: jest.Mock; update: jest.Mock };
+  let goodplace: { findUnique: jest.Mock; update: jest.Mock };
   let service: AdminAuthService;
   const now = new Date('2026-11-23T00:00:00.000Z');
 
@@ -47,11 +47,14 @@ describe('AdminAuthService', () => {
         Promise.resolve({ failedLoginAttempts: admin.failedLoginAttempts + 1 }),
       ),
     };
-    kkiru = {
+    goodplace = {
       findUnique: jest.fn(() => Promise.resolve(null)),
       update: jest.fn(),
     };
-    const prisma = { choidolsangAdmin: choidolsang, kkiruAdmin: kkiru } as unknown as PrismaService;
+    const prisma = {
+      choidolsangAdmin: choidolsang,
+      goodplaceAdmin: goodplace,
+    } as unknown as PrismaService;
     service = new AdminAuthService(prisma);
   });
 
@@ -69,11 +72,11 @@ describe('AdminAuthService', () => {
     });
   });
 
-  it('does not accept a choidolsang account on kkiru', async () => {
-    await expect(service.login('kkiru', admin.email, PASSWORD, now)).rejects.toBeInstanceOf(
+  it('does not accept a choidolsang account on goodplace', async () => {
+    await expect(service.login('goodplace', admin.email, PASSWORD, now)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
-    expect(kkiru.findUnique).toHaveBeenCalled();
+    expect(goodplace.findUnique).toHaveBeenCalled();
     expect(choidolsang.findUnique).not.toHaveBeenCalled();
   });
 

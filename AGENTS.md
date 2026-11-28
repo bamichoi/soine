@@ -2,21 +2,21 @@
 
 ## 프로젝트 개요
 
-pnpm 워크스페이스 모노레포. 초이돌상(choidolsang) 서비스와 끼루(kkiru) 운영 도구를 함께 관리한다.
+pnpm 워크스페이스 모노레포. 초이돌상(choidolsang) 서비스와 굿플레이스(goodplace) 운영 도구를 함께 관리한다.
 
 ## 도메인
 
 | 도메인                  | 앱                      | 용도                                             |
 | ----------------------- | ----------------------- | ------------------------------------------------ |
 | `choidolsang.com`       | `apps/choidolsang-web`  | 초이돌상 고객용 서비스                           |
-| `admin.choidolsang.com` | `apps/backoffice`       | 로그인 화면에서 서비스 탭을 골라 `/choidolsang` 또는 `/kkiru` 백오피스로 로그인 |
+| `admin.choidolsang.com` | `apps/backoffice`       | 로그인 화면에서 서비스 탭을 골라 `/choidolsang` 또는 `/goodplace` 백오피스로 로그인 |
 | `api.choidolsang.com`   | `apps/backend`          | 공통 REST API                                    |
 
 ## 구조
 
 ```bash
 apps/choidolsang-web/  # Next.js (초이돌상 고객 UI, REST API 소비자)
-apps/backoffice/       # Next.js (초이돌상·끼루 운영자 UI, 경로로 서비스 분기)
+apps/backoffice/       # Next.js (초이돌상·굿플레이스 운영자 UI, 경로로 서비스 분기)
 apps/backend/          # NestJS (REST API, 비즈니스 로직, PostgreSQL)
 packages/api-contract/ # OpenAPI 스펙 & 생성 타입
 packages/shared/       # 공통 타입/유틸 (비즈니스 로직 금지)
@@ -26,11 +26,11 @@ docs/adr/              # 아키텍처 의사결정 기록
 ## 핵심 규칙
 
 - 프론트/백엔드는 REST API(OpenAPI 계약)로만 통신. 앱 간 직접 import 금지.
-- 초이돌상과 끼루는 DB에서 PostgreSQL 스키마(`choidolsang`, `kkiru`)로 논리적으로 분리한다.
+- 초이돌상과 굿플레이스는 DB에서 PostgreSQL 스키마(`choidolsang`, `goodplace`)로 논리적으로 분리한다.
   - 각 서비스의 테이블은 자기 스키마에 둔다 (Prisma `@@schema`).
   - 두 스키마의 테이블끼리 관계(외래키)를 맺지 않는다.
   - 관리자 계정과 세션도 서비스마다 따로 있다. 한 계정으로 두 서비스에 로그인하지 않는다.
-- 백오피스의 서비스 분기(`/choidolsang`, `/kkiru`) 접근 권한은 반드시 백엔드에서 강제한다.
+- 백오피스의 서비스 분기(`/choidolsang`, `/goodplace`) 접근 권한은 반드시 백엔드에서 강제한다.
   프론트의 경로 가드는 UX용일 뿐 보안 경계가 아니다.
 - 코드 포맷/린트: Biome (single quotes, 2-space indent, 100자, trailing commas)
 - shared 패키지: 2곳 이상 중복 확인 후에만 승격. 비즈니스 로직 금지.
@@ -101,6 +101,24 @@ conventional commits 형식 사용:
 - 아키텍처/운영 정책/API 계약/DB 스키마 변경 시 ADR 작성.
 - 위치: `docs/adr/ADR-XXXX-제목.md` (템플릿: `docs/templates/adr-template.md`)
 - PR 본문에 ADR 파일 경로 연결.
+
+## AI 에이전트 팀
+
+Claude Code에서 soine 작업은 네 역할로 나눈다. 하위 에이전트 정의는 `.claude/agents/`에 있다.
+
+| 역할      | 에이전트      | 맡는 일                                                                  |
+| --------- | ------------- | ------------------------------------------------------------------------ |
+| 팀장      | 메인 에이전트 | 사용자와 대화, 일 나누기, 결과 검토, 커밋·푸시·PR(사용자 허락 후)         |
+| 기획      | `planner`     | Issue 작성, 업무 흐름·용어·정책 설계, ADR 초안. 코드 수정 안 함           |
+| UI/UX 디자인 | `designer` | 화면 구성·시각 위계·상호작용·반응형 설계, `docs/design/` 시안. 코드 수정 안 함 |
+| 개발      | `developer`   | 구현, lint·format·typecheck·test 검증. 커밋·PR 안 함                      |
+
+- 흐름: 사용자 요청 → 팀장 → 기획(Issue·규칙) → 디자인(화면) → 사용자 확인 → 개발(구현·검증) → 팀장 검토 → 사용자 허락 후 커밋·PR.
+- 작은 수정은 팀장이 직접 해도 된다. 새 기능, 정책·스키마 변경은 기획을, 새 화면이나 화면 개편은 디자인을 거친다.
+- UI 설계와 디자인은 디자인팀이 맡는다. 개발팀은 디자인팀 명세·시안대로 구현하고, 명세와 다르게 만들어야 하면
+  임의로 바꾸지 말고 팀장을 거쳐 디자인팀에 확인한다.
+- 하위 에이전트는 사용자와 직접 이야기하지 않는다. 결정이 필요하면 팀장이 사용자에게 묻는다.
+- 개발 서버 켜기·끄기, 화면 확인은 팀장이 한다.
 
 ## AI 사용 규칙
 

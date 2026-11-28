@@ -8,8 +8,7 @@ export const metadata: Metadata = {
 
 export default function ChoidolsangInquiriesPage() {
   return (
-    <div className="p-4 md:p-8">
-      {/* 화면 제목은 상단 현재 위치에 표시되므로, 제목은 보조기기용으로만 둔다. */}
+    <div className="p-4 md:px-8 md:pt-2 md:pb-8">
       <h1 className="sr-only">문의</h1>
       {/* 목록 조건을 URL 검색 파라미터에서 읽으므로 Suspense가 필요하다. */}
       <Suspense>

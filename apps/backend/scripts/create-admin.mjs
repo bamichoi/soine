@@ -1,14 +1,14 @@
 // 서비스별 백오피스 관리자 계정을 만든다. 계정은 서비스 스키마(<service>.admins)에 저장되며
 // 서비스 간에 공유되지 않는다.
 // 사용법: pnpm --filter @soine/backend admin:create -- <service> <email> <name>
-//   service: choidolsang 또는 kkiru
+//   service: choidolsang 또는 goodplace
 // ADMIN_PASSWORD 환경변수가 있으면 그 값을 쓰고, 없으면 임시 비밀번호를 생성해 한 번만 출력한다.
 import { randomBytes, randomUUID } from 'node:crypto';
 import 'dotenv/config';
 import argon2 from 'argon2';
 import pg from 'pg';
 
-const SERVICES = new Set(['choidolsang', 'kkiru']);
+const SERVICES = new Set(['choidolsang', 'goodplace']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const [service, rawEmail, name] = process.argv
@@ -27,7 +27,7 @@ function fail(message) {
 if (!SERVICES.has(service)) {
   fail(
     'Usage: pnpm --filter @soine/backend admin:create -- <service> <email> <name>\n' +
-      'service: choidolsang or kkiru',
+      'service: choidolsang or goodplace',
   );
 } else if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
   fail('A valid email of up to 254 characters is required.');

@@ -1,6 +1,12 @@
 'use client';
 
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  DANGER_PRIMARY_BUTTON_CLASS_NAME,
+  ERROR_BOX_CLASS_NAME,
+  PRIMARY_BUTTON_CLASS_NAME,
+  SECONDARY_BUTTON_CLASS_NAME,
+} from '@/lib/ui';
 
 type ConfirmDialogProps = {
   title: string;
@@ -17,9 +23,13 @@ type ConfirmDialogProps = {
   getErrorMessage: (error: unknown) => string;
 };
 
+const DIALOG_CLASS_NAME =
+  'm-auto w-[min(26rem,calc(100vw-2rem))] rounded-[20px] border-0 bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-(--shadow-pop) backdrop:bg-[var(--backdrop)]';
+
+// 확인 버튼 (docs/design/goodplace-style-guide.md '버튼')
 const CONFIRM_TONE_CLASS_NAMES = {
-  danger: 'bg-[var(--error)] hover:opacity-90',
-  primary: 'bg-[var(--brand)] hover:bg-[var(--brand-hover)]',
+  danger: DANGER_PRIMARY_BUTTON_CLASS_NAME,
+  primary: PRIMARY_BUTTON_CLASS_NAME,
 };
 
 // 되돌리기 어려운 동작을 한 번 더 확인하는 공통 모달.
@@ -71,7 +81,7 @@ export function ConfirmDialog({
   return (
     <dialog
       aria-labelledby={titleId}
-      className="m-auto w-[min(26rem,calc(100vw-2rem))] border border-[var(--line)] bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-xl backdrop:bg-black/40"
+      className={DIALOG_CLASS_NAME}
       onCancel={(event) => {
         if (isPending) {
           event.preventDefault();
@@ -81,18 +91,18 @@ export function ConfirmDialog({
       ref={dialogRef}
     >
       <div className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold" id={titleId}>
+        <h2 className="text-lg font-extrabold" id={titleId}>
           {title}
         </h2>
         <div className="text-sm leading-6">{message}</div>
         {errorMessage ? (
-          <p className="bg-[var(--error-soft)] px-3 py-2 text-sm text-[var(--error)]" role="alert">
+          <p className={ERROR_BOX_CLASS_NAME} role="alert">
             {errorMessage}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
           <button
-            className="h-10 border border-[var(--line)] px-4 text-sm font-medium hover:bg-[var(--background)] disabled:opacity-60"
+            className={SECONDARY_BUTTON_CLASS_NAME}
             disabled={isPending}
             onClick={onClose}
             type="button"
@@ -100,7 +110,7 @@ export function ConfirmDialog({
             취소
           </button>
           <button
-            className={`h-10 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${CONFIRM_TONE_CLASS_NAMES[tone]}`}
+            className={CONFIRM_TONE_CLASS_NAMES[tone]}
             disabled={isPending}
             onClick={handleConfirm}
             type="button"

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ChoidolsangReservationEdit } from '@/components/choidolsang-reservation-form';
-import { PageTitleBar } from '@/components/page-title-bar';
+import { PageHead } from '@/components/page-parts';
 
 type ReservationEditPageProps = {
   params: Promise<{ code: string }>;
@@ -27,10 +27,10 @@ export default async function ChoidolsangReservationEditPage({ params }: Reserva
   }
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:px-8 md:pt-2 md:pb-8">
       <h1 className="sr-only">예약</h1>
-      <div className="flex max-w-3xl flex-col gap-4">
-        <PageTitleBar title="예약 수정" />
+      <div className="max-w-4xl">
+        <PageHead title="예약 수정" />
         <ChoidolsangReservationEdit code={code} />
       </div>
     </div>
